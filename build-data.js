@@ -1,16 +1,25 @@
 /* Build suppliers-data.js (window.GP_SUPPLIERS) and data/site-data.js (window.GP_SITE)
    from the CPHI_MILAN repository. Run:  node build-data.js
-   The design HTML is NOT touched. */
+   The design HTML is NOT touched.
+
+   GP_SITE.companies = the joined DATA from CPHI_MILAN/index.html (base)
+                       UNION every supplier in ranking.jsonl missing from DATA,
+                       reconstructed from profiles/companies/contacts/quotes/cphi. */
 "use strict";
 const fs = require("fs");
 const path = require("path");
 
 const REPO = "C:/Projects/Артем/CPHI_MILAN";
 const OUT  = "C:/Projects/Артем/GetPostach";
-const INDEX   = path.join(REPO, "index.html");
-const RANKING = path.join(REPO, "data/ranking.jsonl");
+const INDEX     = path.join(REPO, "index.html");
+const RANKING   = path.join(REPO, "data/ranking.jsonl");
+const PROFILES  = path.join(REPO, "data/profiles.jsonl");
+const CONTACTS  = path.join(REPO, "data/contacts.jsonl");
+const QUOTES    = path.join(REPO, "data/quotes.jsonl");
+const COMPANIES = path.join(REPO, "data/companies.jsonl");
+const CPHI      = path.join(REPO, "data/cphi-milan-2026-exhibitors.json");
 
-// ---------- 1. extract the joined DATA object from the old index.html ----------
+// ---------- extract the joined DATA object from the old index.html ----------
 function extractDATA() {
   const html = fs.readFileSync(INDEX, "utf8");
   const m = html.indexOf("const DATA =");
@@ -31,16 +40,21 @@ function extractDATA() {
     if (ch === "{") depth++;
     else if (ch === "}") { depth--; if (depth === 0) { i++; break; } }
   }
-  const literal = html.slice(start, i);
-  // eval the object literal (data only – no code)
   // eslint-disable-next-line no-eval
-  const DATA = eval("(" + literal + ")");
-  return DATA;
+  return eval("(" + html.slice(start, i) + ")");
 }
 
 // ---------- helpers ----------
 function readJSONL(file) {
-  return fs.readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l));
+  const out = [];
+  const txt = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  txt.split(/\r?\n/).forEach(l => { l = l.trim(); if (!l) return; try { out.push(JSON.parse(l)); } catch (e) {} });
+  return out;
+}
+function groupByKey(rows, field) {
+  const m = new Map();
+  rows.forEach(r => { const k = r[field]; if (k == null) return; if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+  return m;
 }
 function fnum(n) {
   if (n == null || isNaN(n)) return "";
@@ -72,82 +86,144 @@ function catOf(products) {
   if (f >= 3) return "Харчова";
   return "Фарма";
 }
-function positionsFromCompany(company) {
-  if (!company || !Array.isArray(company.prices)) return [];
+
+// ---------- load sources ----------
+console.log("Reading index.html DATA …");
+const DATA = extractDATA();
+const dataCompanies = DATA.companies || [];
+const byKey = new Map(dataCompanies.map(c => [c.key, c]));
+console.log("  DATA.companies:", dataCompanies.length);
+
+console.log("Reading ranking / profiles / contacts / quotes / companies / cphi …");
+let ranking = readJSONL(RANKING).filter(r => r.role !== "customer");
+ranking.sort((a, b) => (b.score || 0) - (a.score || 0));
+const profByKey     = new Map(readJSONL(PROFILES).map(p => [p.company, p]));
+const contactsByCo  = groupByKey(readJSONL(CONTACTS), "company");
+const quotesByCo    = groupByKey(readJSONL(QUOTES), "company");
+const compRawByKey  = new Map(readJSONL(COMPANIES).map(c => [c.key, c]));
+let exByKey = new Map();
+try { (JSON.parse(fs.readFileSync(CPHI, "utf8")).exhibitors || []).forEach(e => exByKey.set(e.key, e)); } catch (e) {}
+console.log("  ranking:", ranking.length, "| profiles:", profByKey.size, "| cphi:", exByKey.size);
+
+// ---------- reconstruction from raw sources (for keys missing from DATA) ----------
+function buildPeople(rows) {
+  return (rows || []).map((c, i) => ({
+    name: c.name || "", role: c.role || "", email: c.email || "",
+    emails_alt: c.emails_alt || [], phone: c.phone || "", whatsapp: c.whatsapp || "",
+    website: c.website || "", address: c.address || "", primary: i === 0
+  }));
+}
+function buildPrices(rows) {
+  const byProd = new Map();
+  (rows || []).forEach(q => { const p = q.product; if (!p) return; if (!byProd.has(p)) byProd.set(p, []); byProd.get(p).push(q); });
+  const groups = [];
+  for (const [product, qs] of byProd) {
+    const rs = qs.map(q => ({
+      price: (typeof q.price === "number" ? q.price : null),
+      date: q.date || "", spec: q.spec || "", inco: q.incoterms || "", basis: q.basis || "",
+      cur: q.currency || "USD", unit: q.unit || "kg"
+    })).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const nums = rs.filter(r => typeof r.price === "number").map(r => r.price);
+    groups.push({
+      product, cur: (rs[0] && rs[0].cur) || "USD", unit: (rs[0] && rs[0].unit) || "kg",
+      min: nums.length ? Math.min(...nums) : null, max: nums.length ? Math.max(...nums) : null,
+      n: rs.length, rows: rs
+    });
+  }
+  return groups;
+}
+function exhibitOf(key) {
+  const e = exByKey.get(key);
+  return e ? { hall: e.hall || "", stand: e.stand || "", purpose: e.purpose || "" } : undefined;
+}
+// returns {people, prices, exhibit, products} for a key — from DATA if present, else reconstructed
+function resolve(key) {
+  const c = byKey.get(key);
+  if (c) return { people: c.people || [], prices: c.prices || [], exhibit: c.exhibit, products: c.products || [] };
+  return {
+    people: buildPeople(contactsByCo.get(key)),
+    prices: buildPrices(quotesByCo.get(key)),
+    exhibit: exhibitOf(key),
+    products: (profByKey.get(key) || {}).products || []
+  };
+}
+// full GP_SITE company record for a ranking supplier missing from DATA
+function reconstructCompany(r) {
+  const prof = profByKey.get(r.key) || {};
+  const craw = compRawByKey.get(r.key) || {};
+  const res = resolve(r.key);
+  const inb = r.inbound != null ? r.inbound : (craw.inbound || 0);
+  const outb = r.outbound != null ? r.outbound : (craw.outbound || 0);
+  const rec = {
+    key: r.key,
+    name: r.name || prof.name || r.key,
+    country: r.country || prof.country || "",
+    type: r.type_label || "",
+    status: r.status || "",
+    inb, outb, msgs: inb + outb,
+    threads: r.threads != null ? r.threads : (craw.n_threads || 0),
+    quotes: r.quotes != null ? r.quotes : 0,
+    npeople: res.people.length,
+    first: r.first || craw.first || "",
+    last: r.last || craw.last || "",
+    gap: r.gap_days != null ? r.gap_days : null,
+    who: { type_reason: prof.type_reason || "", summary: prof.summary || "", domains: prof.domains || [] },
+    people: res.people,
+    prices: res.prices,
+    products: r.products || prof.products || []
+  };
+  if (res.exhibit) rec.exhibit = res.exhibit;
+  return rec;
+}
+
+// ---------- GP_SITE = DATA companies UNION missing ranking suppliers ----------
+const missing = ranking.filter(r => !byKey.has(r.key)).map(reconstructCompany);
+const siteCompanies = dataCompanies.concat(missing);
+const maxMsgs = Math.max(1, ...siteCompanies.map(c => c.msgs || 0));
+console.log("  GP_SITE companies:", siteCompanies.length, "(DATA", dataCompanies.length, "+ merged", missing.length, ")");
+
+// ---------- GP_SUPPLIERS from ranking (positions/contacts via resolve) ----------
+function positionsOf(prices) {
   const out = [];
-  company.prices.forEach(g => {
+  (prices || []).forEach(g => {
     const rows = (g.rows || []).filter(r => typeof r.price === "number" && r.date)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
     if (!rows.length) return;
     const hist = rows.map(r => ({ m: String(r.date).slice(2, 7), p: r.price }));
-    const unit = g.unit || "kg", sym = curSym(g.cur || "USD");
     const first = hist[0].p, last = hist[hist.length - 1].p;
     const pct = first ? Math.round((last - first) / first * 100) : 0;
     out.push({
-      name: g.product,
-      price: sym + fnum(last) + " / " + unit,
-      delta: (pct > 0 ? "+" : "") + pct + "%",
-      up: last > first,
-      hist
+      name: g.product, price: curSym(g.cur || "USD") + fnum(last) + " / " + (g.unit || "kg"),
+      delta: (pct > 0 ? "+" : "") + pct + "%", up: last > first, hist
     });
   });
   return out;
 }
-function primaryPerson(company) {
-  if (!company || !Array.isArray(company.people) || !company.people.length) return null;
-  return company.people.find(p => p.primary) || company.people[0];
-}
-
-// ---------- 2. build ----------
-console.log("Reading index.html DATA …");
-const DATA = extractDATA();
-const companies = DATA.companies || [];
-const maxMsgs = DATA.maxMsgs || Math.max(1, ...companies.map(c => c.msgs || 0));
-console.log("  DATA.companies:", companies.length, "| maxMsgs:", maxMsgs);
-const byKey = new Map(companies.map(c => [c.key, c]));
-
-console.log("Reading ranking.jsonl …");
-let ranking = readJSONL(RANKING);
-ranking = ranking.filter(r => r.role !== "customer");
-ranking.sort((a, b) => (b.score || 0) - (a.score || 0));
-console.log("  ranking rows:", ranking.length);
-
 const suppliers = ranking.map((r, idx) => {
-  const c = byKey.get(r.key) || null;
-  const person = primaryPerson(c);
-  const exhibit = c && c.exhibit;
+  const res = resolve(r.key);
+  const person = (res.people || []).find(p => p.primary) || (res.people || [])[0] || null;
+  const ex = res.exhibit;
   return {
-    id: idx + 1,
-    key: r.key,
-    name: r.name || (c && c.name) || r.key,
-    mono: monoOf(r.name || (c && c.name) || r.key),
-    country: (r.country || (c && c.country) || "") + (r.type_label ? " · " + r.type_label : ""),
-    cat: catOf(r.products || (c && c.products) || []),
-    type: r.type_label || (c && c.type) || "",
-    status: r.status || (c && c.status) || "У базі",
-    score: r.score || 0,
-    rating: ratingOf(r.score),
-    us: r.outbound != null ? r.outbound : (c ? c.outb : 0),
-    them: r.inbound != null ? r.inbound : (c ? c.inb : 0),
-    threads: r.threads != null ? r.threads : (c ? c.threads : 0),
-    quotes: r.quotes != null ? r.quotes : (c ? c.quotes : 0),
-    manager: person ? (person.name || "") : "",
-    email: person ? (person.email || "") : "",
-    phone: person ? (person.phone || "") : "",
+    id: idx + 1, key: r.key, name: r.name || r.key, mono: monoOf(r.name || r.key),
+    country: (r.country || "") + (r.type_label ? " · " + r.type_label : ""),
+    cat: catOf(r.products || res.products || []),
+    type: r.type_label || "", status: r.status || "У базі",
+    score: r.score || 0, rating: ratingOf(r.score),
+    us: r.outbound != null ? r.outbound : 0, them: r.inbound != null ? r.inbound : 0,
+    threads: r.threads || 0, quotes: r.quotes || 0,
+    manager: person ? (person.name || "") : "", email: person ? (person.email || "") : "", phone: person ? (person.phone || "") : "",
     site: r.key,
-    cphi: exhibit ? ("CPHI Milan · Hall " + (exhibit.hall || "") + " · " + (exhibit.stand || "")).replace(/\s+·\s+$/, "") : "",
-    products: r.products || (c && c.products) || [],
-    positions: positionsFromCompany(c)
+    cphi: ex ? ("CPHI Milan · Hall " + (ex.hall || "") + " · " + (ex.stand || "")) : "",
+    products: r.products || res.products || [],
+    positions: positionsOf(res.prices)
   };
 });
+console.log("  GP_SUPPLIERS:", suppliers.length, "| with price history:", suppliers.filter(s => s.positions.length).length);
 
-const withPos = suppliers.filter(s => s.positions.length).length;
-console.log("  suppliers built:", suppliers.length, "| with price history:", withPos);
-
-// ---------- 3. write ----------
+// ---------- write ----------
 const siteOut = path.join(OUT, "data/site-data.js");
 fs.mkdirSync(path.dirname(siteOut), { recursive: true });
-fs.writeFileSync(siteOut, "window.GP_SITE = " + JSON.stringify({ companies, maxMsgs }) + ";\n", "utf8");
+fs.writeFileSync(siteOut, "window.GP_SITE = " + JSON.stringify({ companies: siteCompanies, maxMsgs }) + ";\n", "utf8");
 console.log("Wrote", siteOut, fs.statSync(siteOut).size, "bytes");
 
 const supOut = path.join(OUT, "suppliers-data.js");
