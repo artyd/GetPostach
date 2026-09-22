@@ -504,6 +504,17 @@
             <div style="font-size:13px;color:var(--ink2)">Знайдіть товар → оберіть компанії → згенеруйте персональні листи й відкрийте у Gmail.</div>
           </div>
 
+          <!-- Gmail connection status -->
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow)">
+            <span style="flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center; background: {{ gmailBadgeBg }}">{{ iconMailSm }}</span>
+            <div style="flex:1;min-width:180px">
+              <div style="font-size:13.5px;font-weight:700;color:var(--ink)">Gmail для чернеток RFQ</div>
+              <div style="font-size:12px; color: {{ gmailStatusColor }}">{{ gmailStatusText }}</div>
+            </div>
+            <sc-if value="{{ gmailShowConnect }}" hint-placeholder-val="{{ true }}"><button onClick="{{ onConnectGmail }}" style="flex:none;border:none;border-radius:11px;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:13px;padding:10px 16px;cursor:pointer">Підключити Gmail</button></sc-if>
+            <button onClick="{{ onRefreshGmail }}" title="Оновити статус" style="flex:none;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);border-radius:11px;font-family:inherit;font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">Оновити</button>
+          </div>
+
           <div style="display:flex;background:var(--card2);border:1px solid var(--hair);border-radius:14px;padding:4px;gap:4px;max-width:360px">
             <button onClick="{{ onRfqTabNew }}" style="flex:1;border:none;border-radius:11px;padding:10px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer; background: {{ rfqTabNewBg }}; color: {{ rfqTabNewFg }}">Нова розсилка</button>
             <button onClick="{{ onRfqTabActive }}" style="flex:1;border:none;border-radius:11px;padding:10px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer; background: {{ rfqTabActBg }}; color: {{ rfqTabActFg }}">Активні розсилки</button>
@@ -986,6 +997,7 @@ class Component extends DCLogic {
       route: "dashboard",
       chatMessages: [], chatInput: "", chatTyping: false, chatSummary: "", chatCompacting: false, chatStatus2: "", chatFiles: [], chatDragOver: false,
       chats: [], activeChatId: null, historyOpen: false, histQ: "", histEditId: null, histEditVal: "", selBtn: null,
+      gmailAuthed: false, gmailCredsPresent: false, gmailChecked: false,
       collapsed: false,
       mascotEnabled: props.showMascot !== false,
       mood: "neutral",
@@ -1193,6 +1205,23 @@ class Component extends DCLogic {
   loadAuthConfig(){
     try{ fetch(this.apiRoot()+"/auth/config").then(r=>r.json()).then(d=>{ if(d&&d.signup_code_required) this.setState({authCodeRequired:true}); }).catch(()=>{}); }catch(e){}
   }
+  // Gmail (RFQ drafts) connection status + one-time web OAuth.
+  loadGmailStatus(){
+    try{ fetch(this.apiRoot()+"/gmail/status",{headers:this.authHeaders()})
+      .then(r=> r.ok? r.json():null)
+      .then(d=>{ if(d) this.setState({gmailAuthed:!!d.authorized, gmailCredsPresent:!!d.credentials_present, gmailChecked:true}); })
+      .catch(()=>{}); }catch(e){}
+  }
+  connectGmail(){
+    const self=this;
+    fetch(this.apiRoot()+"/gmail/authorize",{headers:this.authHeaders()})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(o){
+        if(!o.ok){ self.say&&self.say("puzzled",(o.d&&o.d.detail)||"Не вдалося почати авторизацію Gmail.",{toast:true,bubble:true}); return; }
+        if(o.d&&o.d.auth_url){ window.open(o.d.auth_url,"_blank"); self.say&&self.say("encouraging","Відкрив вікно Google. Після згоди натисніть «Оновити».",{toast:true,bubble:true}); }
+      })
+      .catch(function(){ self.say&&self.say("puzzled","Сервер недоступний.",{toast:true}); });
+  }
   doRegister(){
     var self=this, S=this.state, name=(S.authName||"").trim(), email=(S.authEmail||"").trim().toLowerCase(), pass=S.authPass||"";
     if(!name||!email||!pass){ this.setState({authErr:"Заповніть ім'я, email і пароль."}); return; }
@@ -1335,6 +1364,16 @@ class Component extends DCLogic {
       rfqTabNewBg:S.rfqTab==="new"?"var(--card)":"transparent", rfqTabNewFg:S.rfqTab==="new"?"var(--ink)":"var(--muted)",
       rfqTabActBg:S.rfqTab==="active"?"var(--card)":"transparent", rfqTabActFg:S.rfqTab==="active"?"var(--ink)":"var(--muted)",
       onRfqTabNew:function(){self.setState({rfqTab:"new"});}, onRfqTabActive:function(){self.setState({rfqTab:"active"});},
+      gmailAuthed:!!S.gmailAuthed, gmailCredsPresent:!!S.gmailCredsPresent,
+      gmailShowConnect: !!S.gmailCredsPresent && !S.gmailAuthed,
+      gmailBadgeBg: S.gmailAuthed?"var(--accent-soft)":"var(--card2)",
+      gmailStatusColor: S.gmailAuthed?"var(--accent-ink)":"#C64A72",
+      gmailStatusText: S.gmailAuthed
+        ? "Підключено — Пігулькін може створювати чернетки листів (нічого не надсилає)."
+        : (S.gmailCredsPresent
+            ? "Не підключено. Натисніть «Підключити Gmail» і увійдіть у потрібний акаунт."
+            : "Не налаштовано: адміністратор має додати gmail_credentials.json у secrets/ на сервері."),
+      onConnectGmail:function(){self.connectGmail();}, onRefreshGmail:function(){self.loadGmailStatus();},
       rfqCartList:cartList, rfqCartEmpty:cartList.length===0,
       rfqProd:S.rfqProd||"", rfqHasProd:!!S.rfqProd,
       rfqProdQ:S.rfqProdOpen?(S.rfqProdQ||""):(S.rfqProd||""),
@@ -1466,6 +1505,7 @@ class Component extends DCLogic {
     if(route==="monitoring"){ this.say("loading",msg,{bubble:true}); if(this._t)clearTimeout(this._t); this._t=setTimeout(()=>{ this.say("happy","Готово! Дві ціни потребують твого підтвердження.",{bubble:true}); this.setState({monitorStatus:"Розпізнано 2 нові листи · чекають на підтвердження."}); },1400); }
     else this.say(mood,msg,{bubble:true});
     if(route!=="rest") this.stopSnake();
+    if(route==="rfq" && !this.state.gmailChecked) this.loadGmailStatus();
   }
 
   // ---------- ПІГУЛЬКІН CHAT ----------

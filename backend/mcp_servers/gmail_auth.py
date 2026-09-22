@@ -105,15 +105,58 @@ def list_drafts(max_results: int = 20) -> dict:
         return {"error": "list_failed", "detail": str(exc)}
 
 
+def credentials_present() -> bool:
+    """True if the OAuth client secret JSON has been placed on the server."""
+    creds_path, _ = _paths()
+    return os.path.exists(creds_path)
+
+
+def is_authorized() -> bool:
+    """True if we have a usable (refreshable) Gmail token."""
+    try:
+        get_credentials()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def redirect_uri() -> str:
+    return os.getenv("GMAIL_REDIRECT_URI", "https://getpostach.alliancegroup95.com/api/gmail/callback")
+
+
+def web_flow(state: str | None = None):
+    """Build a Google OAuth *web* flow (headless-server friendly, redirect-based)."""
+    os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")  # Google may add openid/scope
+    from google_auth_oauthlib.flow import Flow
+
+    creds_path, _ = _paths()
+    if not os.path.exists(creds_path):
+        raise RuntimeError(
+            "Missing OAuth client secret. Add gmail_credentials.json to the server's secrets/ "
+            "(Google Cloud → OAuth client, type 'Web application')."
+        )
+    return Flow.from_client_secrets_file(creds_path, scopes=SCOPES, redirect_uri=redirect_uri(), state=state)
+
+
+def save_token(creds) -> None:
+    _, token_path = _paths()
+    with open(token_path, "w", encoding="utf-8") as fh:
+        fh.write(creds.to_json())
+
+
 def authorize() -> None:
-    """One-time interactive consent. Run this on a machine with a browser."""
+    """One-time interactive consent on a machine WITH a browser (local dev only).
+
+    On the production (headless) server use the web flow instead:
+    GET /api/gmail/authorize -> Google consent -> /api/gmail/callback.
+    """
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     creds_path, token_path = _paths()
     if not os.path.exists(creds_path):
         raise SystemExit(
             f"Missing OAuth client secret at {creds_path}. Download it from Google Cloud "
-            "Console (OAuth client, type 'Desktop app') and set GMAIL_CREDENTIALS_PATH."
+            "Console (OAuth client) and set GMAIL_CREDENTIALS_PATH."
         )
     flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
     creds = flow.run_local_server(port=0)

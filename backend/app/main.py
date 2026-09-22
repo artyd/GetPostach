@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth_models import AuthBase
 from .config import get_settings
 from .db import engine
-from .routers import auth, batch, chat, suppliers
+from .routers import auth, batch, chat, gmail, suppliers
 
 settings = get_settings()
 
@@ -36,6 +36,7 @@ app.include_router(auth.router)
 app.include_router(suppliers.router)
 app.include_router(chat.router)
 app.include_router(batch.router)
+app.include_router(gmail.router)
 
 
 @app.get("/health")

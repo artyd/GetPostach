@@ -32,9 +32,15 @@ services:
       DATABASE_URL: postgresql+psycopg://pigulkin:${POSTGRES_PASSWORD:-pigulkin}@db:5432/pigulkin
       CPHI_DATA_DIR: /cphi/data
       AUTO_IMPORT: "1"
+      # Gmail drafts: the chat's create_gmail_draft tool + the OAuth web flow use these.
+      GMAIL_CREDENTIALS_PATH: /secrets/gmail_credentials.json
+      GMAIL_TOKEN_PATH: /secrets/gmail_token.json
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI:-https://getpostach.alliancegroup95.com/api/gmail/callback}
     volumes:
       # Mount the CPHI_MILAN repo's data dir (read-only) for the one-time import.
       - ${CPHI_REPO_DIR:-../CPHI_MILAN}/data:/cphi/data:ro
+      # Shared secrets: gmail_credentials.json (you add) + gmail_token.json (written after OAuth).
+      - ./secrets:/secrets
     # No host port — reachable only inside the compose network (via Caddy).
     expose:
       - "8000"
