@@ -228,7 +228,8 @@
           <sc-if value="{{ chatHasFiles }}" hint-placeholder-val="{{ false }}">
             <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
               <sc-for list="{{ chatFilesView }}" as="f" hint-placeholder-count="2">
-                <span style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px;padding:6px 8px 6px 12px;font-size:12.5px;font-weight:700;max-width:260px">
+                <span style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px; padding: {{ f.pad }};font-size:12.5px;font-weight:700;max-width:260px">
+                  <sc-if value="{{ f.isImg }}" hint-placeholder-val="{{ false }}"><img src="{{ f.thumb }}" alt="" style="flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(15,110,86,.25)"/></sc-if>
                   <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.label }}</span>
                   <button onClick="{{ f.onRemove }}" title="Прибрати" style="flex:none;width:20px;height:20px;border-radius:50%;border:none;background:rgba(15,110,86,.16);color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><span style="width:10px;height:10px;display:flex">{{ iconClose }}</span></button>
                 </span>
@@ -285,6 +286,13 @@
               <option value="">Усі</option>
               <option value="yes">Тільки з цінами</option>
             </select>
+            <select value="{{ sSort }}" onChange="{{ onSSort }}" title="Сортування" style="padding:9px 13px;border-radius:999px;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-size:13px;font-family:inherit;outline:none;cursor:pointer;box-shadow:var(--shadow)">
+              <option value="az">За абеткою (А→Я)</option>
+              <option value="za">За абеткою (Я→А)</option>
+              <option value="msgs">Найбільше листів</option>
+              <option value="threads">Найбільше переписок (тем)</option>
+              <option value="quotes">Найбільше котирувань</option>
+            </select>
             <span style="font-size:13px;color:var(--muted);margin-left:auto;white-space:nowrap;font-weight:600">{{ supCount }}</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px">
@@ -318,7 +326,6 @@
                 <button onClick="{{ onCloseSup }}" style="position:absolute;top:16px;right:18px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="width:16px;height:16px;display:flex">{{ iconClose }}</span></button>
                 <h2 style="margin:0 0 8px;font-family:var(--sf);font-weight:700;font-size:23px;letter-spacing:-.4px;padding-right:46px">{{ selName }}</h2>
                 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:rgba(255,255,255,.9)">
-                  <span>#{{ selRank }} за обсягом спілкування</span>
                   <span style="font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.22)">{{ selType }}</span>
                   <sc-if value="{{ selCountry }}" hint-placeholder-val="{{ false }}"><span style="font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.22)">{{ selCountry }}</span></sc-if>
                   <span style="font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.2)">{{ selStatus }}</span>
@@ -878,7 +885,7 @@ class Component extends DCLogic {
       celebrate: null,
       cat: "Усі",
       selSup: null,
-      sQ:"", sType:"", sStatus:"", sExpo:"", sPrices:"",
+      sQ:"", sType:"", sStatus:"", sExpo:"", sPrices:"", sSort:"az",
       selKey:null, selProdI:0, comboQ:"", comboOpen:false, tblOpen:false,
       rfqProd:null, rfqProdQ:"", rfqProdOpen:false, rfqAud:"gave", rfqCoQ:"",
       rfqCart:{}, rfqExpand:{}, rfqContact:{}, rfqModal:false, rfqSendIdx:0,
@@ -924,6 +931,7 @@ class Component extends DCLogic {
       if(S.route==="rest"&&S.rzCur==="breath") this.setState({breathPhase:(S.breathPhase+1)%19});
     },1000);
   }
+  componentDidUpdate(){ if(this.state.route==="dashboard"){ try{ this._renderMermaid(); }catch(e){} } }
   componentWillUnmount(){ window.removeEventListener("keydown", this._key); if(this._tourResize){window.removeEventListener("resize",this._tourResize);this._tourResize=null;} this.rzStopLoop(); this.rzStopAudio(); if(this._rzTick)clearInterval(this._rzTick); if(this._compactTimer)clearInterval(this._compactTimer); if(this._t)clearTimeout(this._t); if(this._onPaste){document.removeEventListener("paste",this._onPaste);document.removeEventListener("dragover",this._onDragOver);document.removeEventListener("drop",this._onDrop);document.removeEventListener("dragleave",this._onDragLeaveWin);} }
 
   // ---------- data ----------
@@ -1428,6 +1436,16 @@ class Component extends DCLogic {
     while(i<lines.length){
       const line=lines[i];
       if(!line.trim()){ i++; continue; }
+      const fm=line.match(/^\s*```+\s*([\w-]+)?\s*$/);
+      if(fm){ const lang=(fm[1]||"").toLowerCase(); const buf=[]; i++; let closed=false;
+        while(i<lines.length){ if(/^\s*```+\s*$/.test(lines[i])){ closed=true; i++; break; } buf.push(lines[i]); i++; }
+        const code=buf.join("\n");
+        if(closed){
+          if(lang==="chart"){ const cn=this.buildChatChart(code,key); if(cn){ key++; blocks.push(cn); continue; } }
+          if(lang==="mermaid"){ blocks.push(this.mdMermaid(code,key++)); continue; }
+        }
+        blocks.push(this.mdCode(code,key++,lang)); continue;
+      }
       if(/^\s*(---|\*\*\*|___)\s*$/.test(line)){ blocks.push(h("hr",{key:key++,style:{border:"none",borderTop:"1px solid var(--hair)",margin:"10px 0"}})); i++; continue; }
       const hm=line.match(/^\s*(#{1,6})\s+(.*)$/);
       if(hm){ const lvl=hm[1].length,sz=lvl<=1?18:(lvl===2?16:14); blocks.push(h("div",{key:key++,style:{fontWeight:800,fontSize:sz,margin:"12px 0 6px",color:"var(--ink)",lineHeight:1.3}}, this.mdInline(hm[2]))); i++; continue; }
@@ -1448,6 +1466,72 @@ class Component extends DCLogic {
     }
     return h("div",{style:{display:"block"}}, blocks);
   }
+
+  mdCode(code,key,lang){
+    return h("pre",{key:key,style:{margin:"8px 0",padding:"11px 13px",background:"var(--card2)",border:"1px solid var(--hair)",borderRadius:10,overflowX:"auto",fontSize:12.5,lineHeight:1.5}},
+      h("code",{style:{fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace",color:"var(--ink2)",whiteSpace:"pre"}}, code));
+  }
+
+  // Render a ```chart JSON block as an inline SVG line/bar chart. Returns null on bad input.
+  buildChatChart(src,key){
+    let spec; try{ spec=JSON.parse(src); }catch(e){ return null; }
+    if(!spec||typeof spec!=="object") return null;
+    let series=[];
+    if(Array.isArray(spec.series)) series=spec.series.slice();
+    else if(Array.isArray(spec.points)) series=[{label:spec.label||"",points:spec.points}];
+    else if(Array.isArray(spec.values)&&Array.isArray(spec.labels)) series=[{label:spec.label||"",points:spec.labels.map((l,idx)=>({x:l,y:spec.values[idx]}))}];
+    else return null;
+    series=series.filter(s=>s&&Array.isArray(s.points)&&s.points.length);
+    if(!series.length) return null;
+    const type=(spec.type||"line").toLowerCase()==="bar"?"bar":"line";
+    const cats=[],seen={};
+    series.forEach(s=>s.points.forEach(p=>{const x=String(p.x==null?"":p.x); if(!(x in seen)){seen[x]=1;cats.push(x);}}));
+    const nums=[]; series.forEach(s=>s.points.forEach(p=>{const y=Number(p.y); if(isFinite(y))nums.push(y);}));
+    if(!nums.length) return null;
+    let mn=Math.min(...nums),mx=Math.max(...nums);
+    if(type==="bar"&&mn>0) mn=0;
+    if(mn===mx){ mn=(type==="bar")?0:mn-1; mx=mx+1; }
+    const pal=this.LINE(), fn=(v)=>this.fnum(v);
+    const multi=series.length>1;
+    const W=560,H=224,L=48,R=14,T=(spec.title?26:12),legH=(multi?20:0),B=44+legH,iw=W-L-R,ih=H-T-B;
+    const n=cats.length, xIndex={}; cats.forEach((c,idx)=>xIndex[c]=idx);
+    const Xc=(idx)=>L+(n<=1?iw/2:(idx/(n-1))*iw);
+    const Xb=(idx)=>L+((idx+0.5)/Math.max(1,n))*iw;
+    const Y=(v)=>{const sp=(mx-mn)||1; return T+ih-((v-mn)/sp)*ih;};
+    const kids=[];
+    if(spec.title) kids.push(h("text",{key:"ti",x:L,y:16,fill:"var(--ink)",fontSize:13,fontWeight:700},String(spec.title)));
+    [mn,(mn+mx)/2,mx].forEach((v,ki)=>{ const y=Y(v); kids.push(h("line",{key:"g"+ki,x1:L,y1:y,x2:W-R,y2:y,stroke:"var(--hair)",strokeDasharray:"2 4"})); kids.push(h("text",{key:"yt"+ki,x:L-7,y:y+3,textAnchor:"end",fill:"var(--muted)",fontSize:10},fn(v))); });
+    const step=Math.max(1,Math.ceil(n/8));
+    cats.forEach((c,idx)=>{ if(idx%step&&idx!==n-1) return; const x=(type==="bar")?Xb(idx):Xc(idx); const lbl=c.length>10?c.slice(0,9)+"…":c; kids.push(h("text",{key:"xt"+idx,x:x,y:H-B+16,textAnchor:"middle",fill:"var(--muted)",fontSize:10},lbl)); });
+    if(type==="bar"){
+      const groupW=iw/Math.max(1,n)*0.72, bw=groupW/series.length;
+      series.forEach((s,si)=>{ const col=s.color||pal[si%pal.length]; s.points.forEach((p)=>{ const y=Number(p.y); if(!isFinite(y))return; const idx=xIndex[String(p.x==null?"":p.x)]; if(idx==null)return; const cx=Xb(idx)-groupW/2+bw*si; const yy=Y(y),y0=Y(mn); kids.push(h("rect",{key:"b"+si+"_"+idx,x:cx,y:Math.min(yy,y0),width:Math.max(1,bw-2),height:Math.abs(y0-yy),rx:2,fill:col,opacity:.9},h("title",null,(s.label?s.label+" · ":"")+p.x+": "+fn(y)+(spec.unit?" "+spec.unit:"")))); }); });
+    } else {
+      series.forEach((s,si)=>{ const col=s.color||pal[si%pal.length]; const pts=s.points.map(p=>({idx:xIndex[String(p.x==null?"":p.x)],y:Number(p.y),x:p.x})).filter(o=>o.idx!=null&&isFinite(o.y)); if(!pts.length)return; let d=""; pts.forEach((o,pi)=>{const x=Xc(o.idx),y=Y(o.y); d+=(pi?"L":"M")+x.toFixed(1)+" "+y.toFixed(1)+" ";}); kids.push(h("path",{key:"p"+si,d:d,fill:"none",stroke:col,strokeWidth:2.2,strokeLinejoin:"round",strokeLinecap:"round"})); pts.forEach((o,pi)=>kids.push(h("circle",{key:"c"+si+"_"+pi,cx:Xc(o.idx),cy:Y(o.y),r:3.2,fill:col,stroke:"var(--card2)",strokeWidth:1.4},h("title",null,(s.label?s.label+" · ":"")+o.x+": "+fn(o.y)+(spec.unit?" "+spec.unit:""))))); });
+    }
+    if(multi){ const ly=H-legH+4; let lx=L; series.forEach((s,si)=>{ const col=s.color||pal[si%pal.length]; const lab=s.label||("Ряд "+(si+1)); kids.push(h("rect",{key:"lg"+si,x:lx,y:ly-8,width:11,height:11,rx:2,fill:col})); kids.push(h("text",{key:"lt"+si,x:lx+15,y:ly+1,fill:"var(--ink2)",fontSize:11},lab)); lx+=15+lab.length*6.3+16; }); }
+    return h("div",{key:key,style:{margin:"10px 0",padding:"6px 4px",border:"1px solid var(--hair)",borderRadius:12,background:"var(--card)",overflowX:"auto"}},
+      (spec.unit?h("div",{style:{fontSize:11,color:"var(--muted)",padding:"2px 8px"}}, spec.unit):null),
+      h("svg",{viewBox:"0 0 "+W+" "+H,preserveAspectRatio:"xMidYMid meet",style:{display:"block",width:"100%",height:"auto",overflow:"visible"}}, kids));
+  }
+
+  mdMermaid(code,key){
+    // Placeholder — rendered post-commit by _renderMermaid() (lazy mermaid.js, graceful fallback).
+    return h("div",{key:key,className:"gp-mermaid","data-mmd":code,style:{margin:"10px 0",padding:"10px",border:"1px solid var(--hair)",borderRadius:12,background:"var(--card)",overflowX:"auto",textAlign:"center"}},
+      h("div",{style:{fontSize:12,color:"var(--muted)"}},"Малюю діаграму…"));
+  }
+
+  _renderMermaid(){
+    let nodes; try{ nodes=document.querySelectorAll(".gp-mermaid[data-mmd]:not([data-mmd-done])"); }catch(e){ return; }
+    if(!nodes||!nodes.length) return;
+    const draw=(m)=>{ nodes.forEach((el,i)=>{ if(el.getAttribute("data-mmd-done")) return; el.setAttribute("data-mmd-done","1"); const src=el.getAttribute("data-mmd")||""; const id="gpmmd_"+Date.now()+"_"+i; try{ const p=m.render(id,src); Promise.resolve(p).then(res=>{ el.innerHTML=(res&&res.svg)||res||""; }).catch(()=>{ el.setAttribute("data-mmd-done","fail"); el.innerHTML=""; el.appendChild(this._mmdFallback(src)); }); }catch(e){ el.setAttribute("data-mmd-done","fail"); el.innerHTML=""; el.appendChild(this._mmdFallback(src)); } }); };
+    if(this._mermaid){ draw(this._mermaid); return; }
+    if(this._mermaidLoading) return; this._mermaidLoading=true;
+    import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs")
+      .then(mod=>{ const m=mod.default||mod; try{ m.initialize({startupState:"loose",securityLevel:"loose",theme:"neutral"}); }catch(e){} this._mermaid=m; this._mermaidLoading=false; draw(m); })
+      .catch(()=>{ this._mermaidLoading=false; nodes.forEach(el=>{ if(el.getAttribute("data-mmd-done"))return; el.setAttribute("data-mmd-done","fail"); const src=el.getAttribute("data-mmd")||""; el.innerHTML=""; el.appendChild(this._mmdFallback(src)); }); });
+  }
+  _mmdFallback(src){ const pre=document.createElement("pre"); pre.style.cssText="margin:0;padding:11px 13px;background:var(--card2);border-radius:8px;overflow-x:auto;font-size:12.5px;text-align:left;font-family:ui-monospace,monospace;color:var(--ink2);white-space:pre"; pre.textContent=src; return pre; }
 
   // ---------- attachments (clip / drag&drop / paste) ----------
   fileIcon(kind){ return kind==="image"?"🖼":(kind==="pdf"?"📕":"📄"); }
@@ -2357,7 +2441,13 @@ class Component extends DCLogic {
       if(sq){ const hay=(c.name+" "+(c.country||"")+" "+(c.products||[]).join(" ")+" "+(c.people||[]).map(p=>p.name+" "+(p.email||"")).join(" ")).toLowerCase(); if(hay.indexOf(sq)<0) return false; }
       return true;
     });
-    const suppliers=supFilteredSite.slice(0,150).map(c=>{ const tc=this.typeChip(c.type); const pct=Math.max(4,Math.round((c.msgs||0)/MM*100)); return {key:c.key,rank:c.rank,name:c.name,type:c.type,typeBg:tc.bg,typeFg:tc.fg,country:c.country||"",status:c.status,statusColor:this.statusColor(c.status),msgs:this.n2(c.msgs),threads:this.n2(c.threads),quotes:this.n2(c.quotes),npeople:this.n2(c.npeople),gauge:pct+"%",isExpo:!!c.exhibit,expoLoc:c.exhibit?("Hall "+c.exhibit.hall+" · "+c.exhibit.stand):"",onOpen:()=>this.openCompany(c.key)}; });
+    const sortMode=S.sSort||"az";
+    const nameOf=c=>(c.name||c.key||"").trim();
+    const byName=(a,b)=>nameOf(a).localeCompare(nameOf(b),"uk",{sensitivity:"base",numeric:true});
+    const byNum=(k)=>(a,b)=>((b[k]||0)-(a[k]||0))||byName(a,b);
+    const sorters={az:byName, za:(a,b)=>byName(b,a), msgs:byNum("msgs"), threads:byNum("threads"), quotes:byNum("quotes")};
+    const supSorted=supFilteredSite.slice().sort(sorters[sortMode]||byName);
+    const suppliers=supSorted.slice(0,150).map((c,i)=>{ const tc=this.typeChip(c.type); const pct=Math.max(4,Math.round((c.msgs||0)/MM*100)); return {key:c.key,rank:i+1,name:c.name,type:c.type,typeBg:tc.bg,typeFg:tc.fg,country:c.country||"",status:c.status,statusColor:this.statusColor(c.status),msgs:this.n2(c.msgs),threads:this.n2(c.threads),quotes:this.n2(c.quotes),npeople:this.n2(c.npeople),gauge:pct+"%",isExpo:!!c.exhibit,expoLoc:c.exhibit?("Hall "+c.exhibit.hall+" · "+c.exhibit.stand):"",onOpen:()=>this.openCompany(c.key)}; });
 
     const c=S.selKey?cs.find(x=>x.key===S.selKey):null;
     const selMetrics = c ? [
@@ -2430,7 +2520,7 @@ class Component extends DCLogic {
     });
     const chatHasText=!!(S.chatInput||"").trim();
     const chatSuggest=this.chatSuggestions().map(q=>({label:q,onClick:()=>this.setState({chatInput:q})}));
-    const chatFilesView=(S.chatFiles||[]).map((f,i)=>({label:this.fileIcon(f.kind)+" "+f.name, onRemove:()=>this.removeFile(i)}));
+    const chatFilesView=(S.chatFiles||[]).map((f,i)=>{ const isImg=f.kind==="image"&&f.data; return {isImg:!!isImg, thumb:isImg?("data:"+(f.media_type||"image/png")+";base64,"+f.data):"", pad:isImg?"4px 8px 4px 4px":"6px 8px 6px 12px", label:isImg?f.name:(this.fileIcon(f.kind)+" "+f.name), onRemove:()=>this.removeFile(i)}; });
 
     return {
       themeAttr: S.theme || "light",
@@ -2512,6 +2602,7 @@ class Component extends DCLogic {
       sStatus:S.sStatus||"", onSStatus:(e)=>this.setState({sStatus:e.target.value}),
       sExpo:S.sExpo||"", onSExpo:(e)=>this.setState({sExpo:e.target.value}),
       sPrices:S.sPrices||"", onSPrices:(e)=>this.setState({sPrices:e.target.value}),
+      sSort:S.sSort||"az", onSSort:(e)=>this.setState({sSort:e.target.value}),
       ...selSupVals,
 
       rfqStats, rfqRows, rfqList,
