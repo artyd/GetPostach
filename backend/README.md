@@ -101,6 +101,11 @@ docker compose up -d --build
 ```
 
 First boot imports the data automatically (backend `AUTO_IMPORT=1`, only if the DB is empty).
+
+**Updating a running deploy:** use `./deploy.sh` from the repo root — it pulls, rebuilds, and
+force-recreates Caddy (needed because the frontend is bind-mounted as single files, which a
+running container does not re-read after `git reset` replaces them). It never touches `.env`.
+
 To re-import after updating CPHI_MILAN:
 
 ```bash
