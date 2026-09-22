@@ -75,6 +75,35 @@ def _to_anthropic_messages(messages: list[dict]) -> list[dict]:
     return out
 
 
+def _apply_attachments(convo: list[dict], attachments: list[dict] | None) -> list[dict]:
+    """Attach files (image/pdf/text) to the latest user message as content blocks."""
+    if not attachments:
+        return convo
+    for idx in range(len(convo) - 1, -1, -1):
+        if convo[idx]["role"] != "user":
+            continue
+        text = convo[idx]["content"] if isinstance(convo[idx]["content"], str) else ""
+        blocks: list[dict] = [{"type": "text", "text": text or "Дивись прикріплені файли."}]
+        for a in attachments:
+            kind = (a.get("kind") or "text").lower()
+            data = a.get("data") or ""
+            if not data:
+                continue
+            if kind == "image":
+                blocks.append({"type": "image", "source": {
+                    "type": "base64", "media_type": a.get("media_type") or "image/png", "data": data}})
+            elif kind == "pdf":
+                blocks.append({"type": "document",
+                               "source": {"type": "base64", "media_type": "application/pdf", "data": data},
+                               "title": a.get("name") or "document.pdf"})
+            else:
+                blocks.append({"type": "text",
+                               "text": f"\n\n[Прикріплений файл: {a.get('name') or 'файл'}]\n{str(data)[:200000]}"})
+        convo[idx] = {"role": "user", "content": blocks}
+        break
+    return convo
+
+
 def _run_tools(db: Session, content) -> list[dict]:
     results = []
     for block in content:
@@ -91,9 +120,10 @@ def _run_tools(db: Session, content) -> list[dict]:
     return results
 
 
-def reply(db: Session, messages: list[dict], summary: str | None = None, max_tool_iters: int = 6) -> str:
+def reply(db: Session, messages: list[dict], summary: str | None = None,
+          attachments: list[dict] | None = None, max_tool_iters: int = 6) -> str:
     client = _client()
-    convo = _to_anthropic_messages(messages)
+    convo = _apply_attachments(_to_anthropic_messages(messages), attachments)
     if not convo:
         raise ChatError("no user message")
 
@@ -117,11 +147,11 @@ def reply(db: Session, messages: list[dict], summary: str | None = None, max_too
 
 
 def reply_stream(db: Session, messages: list[dict], summary: str | None = None,
-                 max_tool_iters: int = 6) -> Iterator[dict]:
+                 attachments: list[dict] | None = None, max_tool_iters: int = 6) -> Iterator[dict]:
     """Yields event dicts: {type: delta|status|done|error, text?}."""
     try:
         client = _client()
-        convo = _to_anthropic_messages(messages)
+        convo = _apply_attachments(_to_anthropic_messages(messages), attachments)
         if not convo:
             yield {"type": "error", "text": "no user message"}
             return

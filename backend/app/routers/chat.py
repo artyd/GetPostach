@@ -32,9 +32,17 @@ class ChatMessage(BaseModel):
     content: str | None = None
 
 
+class Attachment(BaseModel):
+    kind: str = "text"          # "image" | "pdf" | "text"
+    name: str | None = None
+    media_type: str | None = None
+    data: str = ""              # base64 for image/pdf, raw text for text
+
+
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     summary: str | None = None  # compacted context from earlier in the conversation
+    attachments: list[Attachment] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -54,8 +62,9 @@ def chat_health():
 def chat(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.chat_enabled:
         return ChatResponse(reply=_NO_KEY)
+    atts = [a.model_dump() for a in req.attachments] if req.attachments else None
     try:
-        text = chat_service.reply(db, [m.model_dump() for m in req.messages], summary=req.summary)
+        text = chat_service.reply(db, [m.model_dump() for m in req.messages], summary=req.summary, attachments=atts)
     except chat_service.ChatError as exc:
         return ChatResponse(reply=f"Помилка чату: {exc}")
     return ChatResponse(reply=text)
@@ -65,6 +74,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 def chat_stream(req: ChatRequest):
     msgs = [m.model_dump() for m in req.messages]
     summary = req.summary
+    atts = [a.model_dump() for a in req.attachments] if req.attachments else None
 
     def sse():
         if not settings.chat_enabled:
@@ -73,7 +83,7 @@ def chat_stream(req: ChatRequest):
             return
         db = SessionLocal()
         try:
-            for ev in chat_service.reply_stream(db, msgs, summary=summary):
+            for ev in chat_service.reply_stream(db, msgs, summary=summary, attachments=atts):
                 yield "data: " + json.dumps(ev, ensure_ascii=False) + "\n\n"
         finally:
             db.close()
