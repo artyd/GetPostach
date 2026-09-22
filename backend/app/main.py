@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import chat, suppliers
+from .routers import batch, chat, suppliers
 
 settings = get_settings()
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(suppliers.router)
 app.include_router(chat.router)
+app.include_router(batch.router)
 
 
 @app.get("/health")

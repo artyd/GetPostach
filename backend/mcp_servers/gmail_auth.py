@@ -53,6 +53,58 @@ def get_service():
     return build("gmail", "v1", credentials=get_credentials(), cache_discovery=False)
 
 
+def build_raw(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> str:
+    import base64
+    from email.message import EmailMessage
+
+    msg = EmailMessage()
+    msg["To"] = to
+    if cc:
+        msg["Cc"] = cc
+    if bcc:
+        msg["Bcc"] = bcc
+    msg["Subject"] = subject
+    msg.set_content(body)
+    return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
+def create_draft(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> dict:
+    """Create a Gmail draft (does NOT send). Returns draft id or a friendly error."""
+    try:
+        service = get_service()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "gmail_not_ready", "detail": str(exc)}
+    try:
+        raw = build_raw(to, subject, body, cc, bcc)
+        draft = service.users().drafts().create(
+            userId="me", body={"message": {"raw": raw}}
+        ).execute()
+        return {
+            "ok": True, "draft_id": draft.get("id"),
+            "url": "https://mail.google.com/mail/u/0/#drafts",
+            "note": "Чернетку створено. Перегляньте й надішліть вручну в Gmail.",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "draft_failed", "detail": str(exc)}
+
+
+def list_drafts(max_results: int = 20) -> dict:
+    try:
+        service = get_service()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "gmail_not_ready", "detail": str(exc)}
+    try:
+        resp = service.users().drafts().list(userId="me", maxResults=max_results).execute()
+        out = []
+        for d in resp.get("drafts", []):
+            full = service.users().drafts().get(userId="me", id=d["id"], format="metadata").execute()
+            headers = {h["name"]: h["value"] for h in full.get("message", {}).get("payload", {}).get("headers", [])}
+            out.append({"draft_id": d["id"], "to": headers.get("To", ""), "subject": headers.get("Subject", "")})
+        return {"drafts": out}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "list_failed", "detail": str(exc)}
+
+
 def authorize() -> None:
     """One-time interactive consent. Run this on a machine with a browser."""
     from google_auth_oauthlib.flow import InstalledAppFlow

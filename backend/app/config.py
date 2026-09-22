@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     chat_model: str = "claude-sonnet-4-6"
     chat_max_tokens: int = 4096
+    # Cheap model for conversation compaction (summaries) and bulk batch letters.
+    summary_model: str = "claude-haiku-4-5"
+    batch_model: str = "claude-sonnet-4-6"
 
     cors_origins: str = "http://localhost:8765,https://artyd.github.io"
     app_env: str = "dev"

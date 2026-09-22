@@ -80,6 +80,29 @@ TOOLS: list[dict] = [
         "description": "Загальна статистика бази: кількість постачальників, котирувань, контактів, тем, експонентів.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "create_gmail_draft",
+        "description": (
+            "Створити ЧЕРНЕТКУ листа в Gmail (RFQ/запит постачальнику). Лист НЕ надсилається — "
+            "людина перевіряє й надсилає сама. Спочатку візьми email контакту з бази (get_supplier). "
+            "Склади професійний лист українською або англійською відповідно до країни постачальника."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Email одержувача (через кому для кількох)"},
+                "subject": {"type": "string", "description": "Тема листа"},
+                "body": {"type": "string", "description": "Текст листа"},
+                "cc": {"type": "string", "description": "Копія (необов'язково)"},
+            },
+            "required": ["to", "subject", "body"],
+        },
+    },
+    {
+        "name": "list_gmail_drafts",
+        "description": "Перелічити наявні чернетки в Gmail (id, кому, тема).",
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -107,4 +130,13 @@ def dispatch(db: Session, name: str, args: dict) -> dict:
         return d or {"error": "not_found", "term": args.get("term")}
     if name == "base_stats":
         return queries.stats(db)
+    if name == "create_gmail_draft":
+        from mcp_servers import gmail_auth
+        return gmail_auth.create_draft(
+            to=args.get("to", ""), subject=args.get("subject", ""),
+            body=args.get("body", ""), cc=args.get("cc", "") or "",
+        )
+    if name == "list_gmail_drafts":
+        from mcp_servers import gmail_auth
+        return gmail_auth.list_drafts(int(args.get("max_results") or 20))
     return {"error": "unknown_tool", "name": name}

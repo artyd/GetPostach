@@ -854,7 +854,7 @@ class Component extends DCLogic {
       openPosName: "",
       openPos: 0,
       route: "dashboard",
-      chatMessages: [], chatInput: "", chatTyping: false,
+      chatMessages: [], chatInput: "", chatTyping: false, chatSummary: "", chatCompacting: false, chatStatus2: "",
       collapsed: false,
       mascotEnabled: props.showMascot !== false,
       mood: "neutral",
@@ -891,6 +891,7 @@ class Component extends DCLogic {
   componentDidMount(){
     try{ const s=JSON.parse(localStorage.getItem("gp_rest_v2")||"{}"); if(s.best||s.stats) this.setState({rzBest:s.best||{},rzStats:s.stats||this.state.rzStats,rzStreak:s.streak||4,vol:s.vol==null?45:s.vol,sfx:s.sfx!==false}); }catch(e){}
     if(this.state.route==="dashboard") this.seedChat();
+    this._compactTimer = setInterval(()=>{ this.maybeCompact(true); }, 30*60*1000);
     this._key = (e)=>this.rzKey(e);
     window.addEventListener("keydown", this._key);
     this._rzTick = setInterval(()=>{ const S=this.state;
@@ -900,7 +901,7 @@ class Component extends DCLogic {
       if(S.route==="rest"&&S.rzCur==="breath") this.setState({breathPhase:(S.breathPhase+1)%19});
     },1000);
   }
-  componentWillUnmount(){ window.removeEventListener("keydown", this._key); if(this._tourResize){window.removeEventListener("resize",this._tourResize);this._tourResize=null;} this.rzStopLoop(); this.rzStopAudio(); if(this._rzTick)clearInterval(this._rzTick); if(this._t)clearTimeout(this._t); }
+  componentWillUnmount(){ window.removeEventListener("keydown", this._key); if(this._tourResize){window.removeEventListener("resize",this._tourResize);this._tourResize=null;} this.rzStopLoop(); this.rzStopAudio(); if(this._rzTick)clearInterval(this._rzTick); if(this._compactTimer)clearInterval(this._compactTimer); if(this._t)clearTimeout(this._t); }
 
   // ---------- data ----------
   get SUPPLIERS(){ return (typeof window!=="undefined"&&window.GP_SUPPLIERS)||[]; }
@@ -1293,32 +1294,81 @@ class Component extends DCLogic {
   scrollChat(){
     try{ const el=document.getElementById("gpChatScroll"); if(el) el.scrollTop=el.scrollHeight; }catch(e){}
   }
-  resetChat(){ this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}],chatInput:"",chatTyping:false}); }
+  resetChat(){ this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}],chatInput:"",chatTyping:false,chatSummary:"",chatStatus2:""}); }
   onChatKey(e){ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); this.sendChat(); } }
   sendChat(){
     const text=(this.state.chatInput||"").trim();
     if(!text || this.state.chatTyping) return;
     const msgs=this.state.chatMessages.concat([{role:"user",text}]);
-    this.setState({chatMessages:msgs, chatInput:"", chatTyping:true}, ()=>this.scrollChat());
-    this.pigulkinReply(msgs).then(reply=>{
-      this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:reply}]), chatTyping:false}, ()=>this.scrollChat());
+    this.setState({chatMessages:msgs, chatInput:"", chatTyping:true, chatStatus2:""}, ()=>this.scrollChat());
+    const api=this.PIGULKIN_API;
+    if(api){ this.streamChat(api, msgs); }
+    else {
+      this.pigulkinReply(msgs).then(reply=>{
+        this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:reply}]), chatTyping:false}, ()=>this.scrollChat());
+      });
+    }
+  }
+  // Streaming (SSE) reply from the backend, with incremental rendering.
+  streamChat(api, msgs){
+    const url=api+"/stream";
+    const body=JSON.stringify({ messages: msgs.map(m=>({role:m.role, text:m.text})), summary: this.state.chatSummary||"" });
+    let started=false;
+    const appendDelta=(t)=>{
+      let cm=this.state.chatMessages.slice();
+      if(!started){ started=true; cm=cm.concat([{role:"bot",text:t,streaming:true}]); this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>this.scrollChat()); }
+      else { const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{text:(last.text||"")+t}); this.setState({chatMessages:cm},()=>this.scrollChat()); } }
+    };
+    fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body}).then((resp)=>{
+      if(!resp.ok || !resp.body){ throw new Error("stream http "+resp.status); }
+      const reader=resp.body.getReader(); const dec=new TextDecoder(); let buf="";
+      const finish=()=>{ let cm=this.state.chatMessages.slice(); const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{streaming:false}); } this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>{ this.scrollChat(); this.maybeCompact(false); }); };
+      const pump=()=>reader.read().then(({done,value})=>{
+        if(done){ finish(); return; }
+        buf+=dec.decode(value,{stream:true});
+        let i;
+        while((i=buf.indexOf("\n\n"))>=0){
+          const chunk=buf.slice(0,i); buf=buf.slice(i+2);
+          const dl=chunk.split("\n").filter(function(l){return l.indexOf("data:")===0;}).map(function(l){return l.slice(5).trim();}).join("");
+          if(!dl) continue;
+          let ev; try{ ev=JSON.parse(dl); }catch(e){ continue; }
+          if(ev.type==="delta" && ev.text){ appendDelta(ev.text); }
+          else if(ev.type==="status"){ this.setState({chatStatus2:ev.text||""}); }
+          else if(ev.type==="error"){ appendDelta((started?"\n\n":"")+"⚠ "+(ev.text||"Помилка")); }
+        }
+        return pump();
+      });
+      return pump();
     }).catch(()=>{
-      this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:"Не вдалося зв'язатися з сервером Пігулькіна. Спробуйте ще раз трохи згодом."}]), chatTyping:false}, ()=>this.scrollChat());
+      this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:"Не вдалося зв'язатися з сервером Пігулькіна. Спробуйте ще раз трохи згодом."}]), chatTyping:false, chatStatus2:""},()=>this.scrollChat());
     });
   }
-  // Async reply. Real backend when PIGULKIN_API is set; otherwise чесна відповідь-заглушка.
+  // Auto-compaction: fold older turns into a summary to save tokens (also on a 30-min timer).
+  maybeCompact(force){
+    const api=this.PIGULKIN_API; if(!api) return;
+    const S=this.state; if(S.chatCompacting) return;
+    const msgs=S.chatMessages||[]; if(msgs.length<2) return;
+    const body=msgs.slice(1); // keep the greeting at index 0
+    const KEEP=6;
+    if(body.length<=KEEP) return;
+    if(!force && body.length<14) return;
+    const toCompact=body.slice(0, body.length-KEEP).filter(function(m){return !m.compacted;});
+    const keep=body.slice(body.length-KEEP);
+    if(toCompact.length<2) return;
+    this.setState({chatCompacting:true});
+    fetch(api+"/compact",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({messages:toCompact.map(function(m){return {role:m.role,text:m.text};}), summary:S.chatSummary||""})})
+      .then(function(r){return r.json();}).then((d)=>{
+        const note={role:"bot",text:"🗜 Попередню частину розмови згорнуто, щоб не перевантажувати контекст і не витрачати зайві токени.",compacted:true};
+        this.setState({chatSummary:(d&&d.summary)||S.chatSummary||"", chatMessages:[msgs[0], note].concat(keep), chatCompacting:false},()=>this.scrollChat());
+      }).catch(()=>this.setState({chatCompacting:false}));
+  }
+  // Fallback when no backend is configured (window.GP_PIGULKIN_API empty).
   pigulkinReply(messages){
-    const api=this.PIGULKIN_API;
-    if(api){
-      return fetch(api,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({messages:messages.map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}))})})
-        .then(r=>r.json()).then(d=>d.reply||d.text||"…");
-    }
     return new Promise(res=>setTimeout(()=>res(
       "Я вас почув. Мій «розум» (мовна модель + доступ до бази) ще під'єднується — "+
-      "команда саме розробляє бекенд. Щойно його ввімкнуть, я відповідатиму по суті: "+
-      "шукатиму постачальників, порівнюватиму ціни й готуватиму RFQ прямо тут."
-    ), 650));
+      "щойно бекенд буде доступний за цією адресою, я відповідатиму по суті."
+    ), 500));
   }
 
   // ---------- REST ZONE ENGINE ----------
@@ -2317,7 +2367,7 @@ class Component extends DCLogic {
       // ---- Пігулькін chat ----
       chatMessages,
       chatAvatar:this.buildMascot("happy",44), chatAvatarSm:this.buildMascot("happy",28),
-      chatStatus:S.chatTyping?"друкує…":"Онлайн · готовий допомогти",
+      chatStatus:S.chatTyping?(S.chatStatus2||"друкує…"):"Онлайн · готовий допомогти",
       chatDot:S.chatTyping?"#F2A73B":"var(--accent)",
       chatTyping:!!S.chatTyping,
       chatShowSuggest:(S.chatMessages||[]).length<=1 && !S.chatTyping,
