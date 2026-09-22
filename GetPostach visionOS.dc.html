@@ -73,6 +73,7 @@
   @keyframes toastIn{0%{transform:translateX(30px);opacity:0}100%{transform:translateX(0);opacity:1}}
   @keyframes breathe{0%,100%{transform:scale(.72);opacity:.65}45%,55%{transform:scale(1);opacity:1}}
   @keyframes fadeUp{0%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:1}}
+  @keyframes slideInRight{0%{transform:translateX(100%)}100%{transform:translateX(0)}}
   @keyframes gpBlink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
   .gp-typing{display:inline-flex;gap:5px;align-items:center}
   .gp-typing i{width:7px;height:7px;border-radius:50%;background:var(--accent-ink);display:block;animation:gpBlink 1.3s infinite ease-in-out}
@@ -171,7 +172,6 @@
       </div>
       <button onClick="{{ onToggleTheme }}" title="Тема" data-tour="theme" style="flex:none;width:42px;height:42px;border-radius:16px;border:1px solid var(--hair);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink)" style-hover="background:var(--card2)"><span style="width:19px;height:19px;display:flex">{{ themeIcon }}</span></button><button style="flex:none;position:relative;width:42px;height:42px;border-radius:16px;border:1px solid var(--hair);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink)" style-hover="background:var(--card2)">
         <span style="width:19px;height:19px;display:flex">{{ iconBell }}</span>
-        <span style="position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:#F2A73B;border:2px solid #fff"></span>
       </button>
       <div data-tour="user" style="flex:none;display:flex;align-items:center;gap:11px;padding-left:6px">
         <div style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;max-width:160px">
@@ -187,7 +187,7 @@
 
       <!-- DASHBOARD -->
       <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
-        <div style="width:92%;max-width:880px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:14px;animation:fadeUp .3s ease">
+        <div style="position:relative;width:96%;max-width:1120px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:14px;animation:fadeUp .3s ease">
 
           <!-- Chat header -->
           <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--card);border:1px solid var(--hair);border-radius:22px;box-shadow:var(--shadow)">
@@ -196,55 +196,127 @@
               <div style="font-family:var(--sf);font-weight:700;font-size:17px;color:var(--ink);line-height:1.2;display:flex;align-items:center;gap:8px">Пігулькін<span style="font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);padding:2px 8px;border-radius:999px">AI-помічник</span></div>
               <div style="font-size:12.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%; background: {{ chatDot }}"></span>{{ chatStatus }}</div>
             </div>
-            <button onClick="{{ onChatReset }}" title="Новий чат" style="flex:none;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);border-radius:999px;padding:8px 15px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:background .14s" style-hover="background:var(--card)">Новий чат</button>
+            <button onClick="{{ onToggleHistory }}" title="Історія чатів" style="flex:none;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);border-radius:999px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .14s" style-hover="background:var(--card)"><span style="width:14px;height:14px;display:flex">{{ iconHistory }}</span>Історія</button>
+            <button onClick="{{ onNewChat }}" title="Новий чат" style="flex:none;border:none;background:var(--accent);color:#fff;border-radius:999px;padding:9px 16px;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;transition:filter .14s" style-hover="filter:brightness(1.07)"><span style="font-size:15px;line-height:1">＋</span>Новий чат</button>
           </div>
 
-          <!-- Message stream -->
-          <div id="gpChatScroll" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:6px 4px 4px">
-            <sc-for list="{{ chatMessages }}" as="m" hint-placeholder-count="2">
-              <div style="display:flex;gap:10px;align-items:flex-end; flex-direction: {{ m.dir }}">
-                <sc-if value="{{ m.isBot }}" hint-placeholder-val="{{ true }}"><span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ m.avatar }}</span></sc-if>
-                <div style="max-width:82%;padding:12px 15px;font-size:14.5px;line-height:1.52;white-space: {{ m.ws }};word-break:break-word;border-radius:20px; background: {{ m.bubbleBg }}; color: {{ m.bubbleFg }}; border: {{ m.bubbleBd }}; box-shadow: {{ m.bubbleShadow }}; border-bottom-left-radius: {{ m.blr }}; border-bottom-right-radius: {{ m.brr }}">{{ m.body }}</div>
+          <!-- ===== EMPTY / NEW CHAT (centered hero) ===== -->
+          <sc-if value="{{ chatEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:10px 0 24px;overflow-y:auto">
+              <span style="flex:none;width:96px;height:96px;display:flex;align-items:center;justify-content:center">{{ chatHeroMascot }}</span>
+              <div style="text-align:center;max-width:560px">
+                <div style="font-family:var(--sf);font-weight:700;font-size:24px;color:var(--ink);letter-spacing:-.4px">{{ chatHeroTitle }}</div>
+                <div style="font-size:14px;color:var(--muted);margin-top:8px;line-height:1.55;text-wrap:pretty">{{ chatHeroSub }}</div>
               </div>
-            </sc-for>
-            <sc-if value="{{ chatTyping }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex;gap:10px;align-items:flex-end">
-                <span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ chatAvatarSm }}</span>
-                <div style="padding:15px 18px;border-radius:20px;border-bottom-left-radius:6px;background:var(--card);border:1px solid var(--hair);box-shadow:var(--shadow)"><span class="gp-typing"><i></i><i></i><i></i></span></div>
+
+              <!-- attachment chips (hero) -->
+              <sc-if value="{{ chatHasFiles }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;max-width:720px">
+                  <sc-for list="{{ chatFilesView }}" as="f" hint-placeholder-count="2">
+                    <span style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px; padding: {{ f.pad }};font-size:12.5px;font-weight:700;max-width:260px">
+                      <sc-if value="{{ f.isImg }}" hint-placeholder-val="{{ false }}"><img src="{{ f.thumb }}" alt="" style="flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(15,110,86,.25)"/></sc-if>
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.label }}</span>
+                      <button onClick="{{ f.onRemove }}" title="Прибрати" style="flex:none;width:20px;height:20px;border-radius:50%;border:none;background:rgba(15,110,86,.16);color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><span style="width:10px;height:10px;display:flex">{{ iconClose }}</span></button>
+                    </span>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- composer (hero, centered) -->
+              <div style="width:100%;max-width:720px;display:flex;align-items:flex-end;gap:8px;background:var(--card);border:2px solid {{ chatComposerBd }};border-radius:24px;padding:6px 8px;box-shadow:var(--shadow);transition:border-color .15s">
+                <button onClick="{{ onAttachClick }}" title="Прикріпити файл (або перетягніть / вставте)" style="flex:none;width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--card2);color:var(--accent-ink)">{{ iconClip }}</button>
+                <textarea value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Запитайте Пігулькіна про постачальників, ціни, RFQ…" rows="1" style="flex:1;border:none;background:transparent;outline:none;resize:none;font-family:inherit;font-size:14.5px;color:var(--ink);line-height:1.5;max-height:140px;min-height:26px;padding:9px 0"></textarea>
+                <input id="gpFileInput" type="file" multiple onChange="{{ onFilePick }}" style="display:none"/>
+                <button onClick="{{ onChatSend }}" title="Надіслати" style="flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .14s,transform .12s;color:#fff; background: {{ chatSendBg }}" style-hover="transform:scale(1.06)">{{ iconSend }}</button>
+              </div>
+
+              <!-- quick questions (below input; disappear once one is picked) -->
+              <sc-if value="{{ chatShowSuggest }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;max-width:720px">
+                  <sc-for list="{{ chatSuggest }}" as="q" hint-placeholder-count="4">
+                    <button onClick="{{ q.onClick }}" style="border:1px solid var(--hair);background:var(--card);color:var(--accent-ink);border-radius:999px;padding:9px 15px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .14s" style-hover="background:var(--accent-soft);transform:translateY(-1px)">{{ q.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <!-- ===== ACTIVE CHAT ===== -->
+          <sc-if value="{{ chatNotEmpty }}" hint-placeholder-val="{{ false }}">
+            <div id="gpChatScroll" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:6px 4px 4px">
+              <sc-for list="{{ chatMessages }}" as="m" hint-placeholder-count="2">
+                <div style="display:flex;gap:10px;align-items:flex-end; flex-direction: {{ m.dir }}">
+                  <sc-if value="{{ m.isBot }}" hint-placeholder-val="{{ true }}"><span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ m.avatar }}</span></sc-if>
+                  <div style="max-width:82%;padding:12px 15px;font-size:14.5px;line-height:1.52;white-space: {{ m.ws }};word-break:break-word;border-radius:20px; background: {{ m.bubbleBg }}; color: {{ m.bubbleFg }}; border: {{ m.bubbleBd }}; box-shadow: {{ m.bubbleShadow }}; border-bottom-left-radius: {{ m.blr }}; border-bottom-right-radius: {{ m.brr }}">{{ m.body }}</div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ chatTyping }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:10px;align-items:flex-end">
+                  <span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ chatAvatarSm }}</span>
+                  <div style="padding:15px 18px;border-radius:20px;border-bottom-left-radius:6px;background:var(--card);border:1px solid var(--hair);box-shadow:var(--shadow)"><span class="gp-typing"><i></i><i></i><i></i></span></div>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- Attachment chips -->
+            <sc-if value="{{ chatHasFiles }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
+                <sc-for list="{{ chatFilesView }}" as="f" hint-placeholder-count="2">
+                  <span style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px; padding: {{ f.pad }};font-size:12.5px;font-weight:700;max-width:260px">
+                    <sc-if value="{{ f.isImg }}" hint-placeholder-val="{{ false }}"><img src="{{ f.thumb }}" alt="" style="flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(15,110,86,.25)"/></sc-if>
+                    <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.label }}</span>
+                    <button onClick="{{ f.onRemove }}" title="Прибрати" style="flex:none;width:20px;height:20px;border-radius:50%;border:none;background:rgba(15,110,86,.16);color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><span style="width:10px;height:10px;display:flex">{{ iconClose }}</span></button>
+                  </span>
+                </sc-for>
               </div>
             </sc-if>
-          </div>
 
-          <!-- Starter prompts -->
-          <sc-if value="{{ chatShowSuggest }}" hint-placeholder-val="{{ true }}">
-            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
-              <sc-for list="{{ chatSuggest }}" as="q" hint-placeholder-count="4">
-                <button onClick="{{ q.onClick }}" style="border:1px solid var(--hair);background:var(--card);color:var(--accent-ink);border-radius:999px;padding:9px 15px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .14s" style-hover="background:var(--accent-soft);transform:translateY(-1px)">{{ q.label }}</button>
-              </sc-for>
+            <!-- Composer -->
+            <div style="display:flex;align-items:flex-end;gap:8px;background:var(--card);border:2px solid {{ chatComposerBd }};border-radius:24px;padding:6px 8px;box-shadow:var(--shadow);transition:border-color .15s">
+              <button onClick="{{ onAttachClick }}" title="Прикріпити файл (або перетягніть / вставте)" style="flex:none;width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--card2);color:var(--accent-ink)">{{ iconClip }}</button>
+              <textarea value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Запитайте Пігулькіна про постачальників, ціни, RFQ… (можна прикріпити файл)" rows="1" style="flex:1;border:none;background:transparent;outline:none;resize:none;font-family:inherit;font-size:14.5px;color:var(--ink);line-height:1.5;max-height:140px;min-height:26px;padding:9px 0"></textarea>
+              <input id="gpFileInput" type="file" multiple onChange="{{ onFilePick }}" style="display:none"/>
+              <button onClick="{{ onChatSend }}" title="Надіслати" style="flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .14s,transform .12s;color:#fff; background: {{ chatSendBg }}" style-hover="transform:scale(1.06)">{{ iconSend }}</button>
             </div>
+            <div style="text-align:center;font-size:11px;color:var(--muted);padding-bottom:2px">{{ chatFootHint }}</div>
           </sc-if>
 
-          <!-- Attachment chips -->
-          <sc-if value="{{ chatHasFiles }}" hint-placeholder-val="{{ false }}">
-            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
-              <sc-for list="{{ chatFilesView }}" as="f" hint-placeholder-count="2">
-                <span style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px; padding: {{ f.pad }};font-size:12.5px;font-weight:700;max-width:260px">
-                  <sc-if value="{{ f.isImg }}" hint-placeholder-val="{{ false }}"><img src="{{ f.thumb }}" alt="" style="flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(15,110,86,.25)"/></sc-if>
-                  <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.label }}</span>
-                  <button onClick="{{ f.onRemove }}" title="Прибрати" style="flex:none;width:20px;height:20px;border-radius:50%;border:none;background:rgba(15,110,86,.16);color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><span style="width:10px;height:10px;display:flex">{{ iconClose }}</span></button>
-                </span>
-              </sc-for>
+          <!-- ===== HISTORY DRAWER ===== -->
+          <sc-if value="{{ historyOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ onHistClose }}" style="position:fixed;inset:0;z-index:70;background:rgba(8,20,16,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;justify-content:flex-end">
+              <div onClick="{{ stop }}" style="width:340px;max-width:90vw;height:100%;background:var(--card-solid);border-left:1px solid var(--hair);box-shadow:-12px 0 40px rgba(10,31,41,.3);display:flex;flex-direction:column;animation:slideInRight .22s ease">
+                <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--hair)">
+                  <div style="flex:1;font-family:var(--sf);font-weight:700;font-size:16px;color:var(--ink)">Історія чатів</div>
+                  <button onClick="{{ onNewChat }}" title="Новий чат" style="border:none;background:var(--accent);color:#fff;border-radius:999px;padding:7px 13px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer">＋ Новий</button>
+                  <button onClick="{{ onHistClose }}" title="Закрити" style="flex:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="width:14px;height:14px;display:flex">{{ iconClose }}</span></button>
+                </div>
+                <div style="padding:12px 16px">
+                  <div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--hair);border-radius:999px;padding:9px 14px">
+                    <span style="flex:none;width:15px;height:15px;color:var(--muted);display:flex">{{ iconSearch }}</span>
+                    <input value="{{ histQ }}" onInput="{{ onHistQ }}" placeholder="Пошук у чатах…" style="border:none;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%"/>
+                  </div>
+                </div>
+                <div style="flex:1;min-height:0;overflow-y:auto;padding:0 10px 14px">
+                  <sc-for list="{{ histList }}" as="c" hint-placeholder-count="4">
+                    <div onClick="{{ c.onOpen }}" style="display:flex;align-items:center;gap:8px;padding:10px 10px;border-radius:12px;cursor:pointer;margin-bottom:3px; background: {{ c.rowBg }}" style-hover="background:var(--card2)">
+                      <div style="flex:1;min-width:0">
+                        <sc-if value="{{ c.editing }}" hint-placeholder-val="{{ false }}">
+                          <input value="{{ histEditVal }}" onInput="{{ onHistEditInput }}" onKeyDown="{{ onHistEditKey }}" onBlur="{{ onHistEditCommit }}" onClick="{{ stop }}" style="width:100%;border:1px solid var(--accent);border-radius:8px;padding:5px 8px;font-family:inherit;font-size:13px;color:var(--ink);background:var(--card);outline:none"/>
+                        </sc-if>
+                        <sc-if value="{{ c.notEditing }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size:13.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</div>
+                          <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ c.time }}</div>
+                        </sc-if>
+                      </div>
+                      <button onClick="{{ c.onRename }}" title="Перейменувати" style="flex:none;width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px" style-hover="background:var(--card);color:var(--accent-ink)">✏️</button>
+                      <button onClick="{{ c.onDelete }}" title="Видалити" style="flex:none;width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px" style-hover="background:#FDECEF;color:#C64A72">🗑</button>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ histEmpty }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;color:var(--muted);font-size:13px;padding:36px 12px">Збережених чатів ще немає. Почніть розмову — вона з'явиться тут.</div></sc-if>
+                </div>
+              </div>
             </div>
           </sc-if>
-
-          <!-- Composer -->
-          <div style="display:flex;align-items:flex-end;gap:8px;background:var(--card);border:2px solid {{ chatComposerBd }};border-radius:24px;padding:6px 8px 6px 8px;box-shadow:var(--shadow);transition:border-color .15s">
-            <button onClick="{{ onAttachClick }}" title="Прикріпити файл (або перетягніть / вставте)" style="flex:none;width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--card2);color:var(--accent-ink)">{{ iconClip }}</button>
-            <textarea value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Запитайте Пігулькіна про постачальників, ціни, RFQ… (можна прикріпити файл)" rows="1" style="flex:1;border:none;background:transparent;outline:none;resize:none;font-family:inherit;font-size:14.5px;color:var(--ink);line-height:1.5;max-height:140px;min-height:26px;padding:9px 0"></textarea>
-            <input id="gpFileInput" type="file" multiple onChange="{{ onFilePick }}" style="display:none"/>
-            <button onClick="{{ onChatSend }}" title="Надіслати" style="flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .14s,transform .12s;color:#fff; background: {{ chatSendBg }}" style-hover="transform:scale(1.06)">{{ iconSend }}</button>
-          </div>
-          <div style="text-align:center;font-size:11px;color:var(--muted);padding-bottom:2px">{{ chatFootHint }}</div>
         </div>
       </sc-if>
 
@@ -454,14 +526,24 @@
           <sc-if value="{{ rfqHasProd }}" hint-placeholder-val="{{ false }}">
             <div>
               <div style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px">Крок 2 · Кому надіслати «{{ rfqProd }}»</div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
                 <sc-for list="{{ rfqAudChips }}" as="a" hint-placeholder-count="4">
                   <button onClick="{{ a.onClick }}" style="border:1px solid;border-radius:22px;padding:8px 15px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .14s; background: {{ a.bg }}; color: {{ a.fg }}; border-color: {{ a.bd }}">{{ a.label }}</button>
                 </sc-for>
+                <span style="width:1px;height:22px;background:var(--hair);margin:0 2px"></span>
+                <button onClick="{{ onRfqExpoToggle }}" title="Лише експоненти CPHI Milan 2026" style="border:1px solid;border-radius:22px;padding:8px 14px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .14s; background: {{ rfqExpoBg }}; color: {{ rfqExpoFg }}; border-color: {{ rfqExpoBd }}">🇮🇹 CPHI</button>
+                <button onClick="{{ onRfqEmailToggle }}" title="Лише з відомим email" style="border:1px solid;border-radius:22px;padding:8px 14px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .14s; background: {{ rfqEmailBg }}; color: {{ rfqEmailFg }}; border-color: {{ rfqEmailBd }}">✉ З email</button>
                 <div style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--hair);border-radius:999px;padding:8px 14px;margin-left:auto;flex:1 1 200px;max-width:280px">
                   <span style="flex:none;width:15px;height:15px;color:var(--muted);display:flex">{{ iconSearch }}</span>
                   <input value="{{ rfqCoQ }}" onInput="{{ onRfqCoQ }}" placeholder="Пошук компанії…" style="border:none;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%"/>
                 </div>
+              </div>
+
+              <!-- results toolbar: select-all + counts + compose -->
+              <div style="position:sticky;top:0;z-index:15;display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow)">
+                <button onClick="{{ onRfqSelectAll }}" style="border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);border-radius:10px;padding:8px 14px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer">{{ rfqSelectAllLabel }}</button>
+                <span style="font-size:13px;color:var(--muted);font-weight:600">Знайдено <b style="color:var(--ink)">{{ rfqShownCount }}</b> · обрано <b style="color:var(--accent-ink)">{{ rfqCartN }}</b></span>
+                <button onClick="{{ onRfqCompose }}" style="margin-left:auto;border:none;border-radius:11px;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:13.5px;padding:10px 18px;cursor:pointer; opacity: {{ rfqComposeOpacity }}">Скласти листи →</button>
               </div>
 
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">
@@ -606,24 +688,37 @@
       <sc-if value="{{ isExhibitions }}" hint-placeholder-val="{{ false }}">
         <div style="width:92%;max-width:1520px;margin:0 auto;display:flex;flex-direction:column;gap:20px;animation:fadeUp .3s ease">
           <div style="background:var(--accent-grad);border-radius:26px;padding:24px 26px;color:#fff;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-            <div style="flex:1;min-width:220px"><div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#7FE0C6;font-weight:800">Підготовка до виставки</div><h2 style="margin:6px 0 0;font-family:var(--sf);font-weight:600;font-size:24px">CPHI Worldwide Milan 2026</h2><div style="font-size:13.5px;color:#B7DED2;margin-top:5px">6–8 жовтня · Fiera Milano Rho · 842 в каталозі</div></div>
-            <div style="display:flex;gap:24px"><div><div style="font-size:11px;color:#8FCDBB;text-transform:uppercase;font-weight:700">Релевантних</div><div style="font-family:var(--sf);font-weight:700;font-size:30px">26</div></div><div><div style="font-size:11px;color:#8FCDBB;text-transform:uppercase;font-weight:700">Брифи готові</div><div style="font-family:var(--sf);font-weight:700;font-size:30px">26</div></div></div>
+            <div style="flex:1;min-width:220px"><div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#7FE0C6;font-weight:800">Підготовка до виставки</div><h2 style="margin:6px 0 0;font-family:var(--sf);font-weight:600;font-size:24px">CPHI Worldwide Milan 2026</h2><div style="font-size:13.5px;color:#B7DED2;margin-top:5px">6–8 жовтня · Fiera Milano Rho · натисніть «Підготувати до зустрічі» — Пігулькін збере бриф із вашої бази</div></div>
+            <div style="display:flex;gap:24px"><div><div style="font-size:11px;color:#8FCDBB;text-transform:uppercase;font-weight:700">Наших експонентів</div><div style="font-family:var(--sf);font-weight:700;font-size:30px">{{ exCount }}</div></div><div><div style="font-size:11px;color:#8FCDBB;text-transform:uppercase;font-weight:700">З даними для брифу</div><div style="font-family:var(--sf);font-weight:700;font-size:30px">{{ exReady }}</div></div></div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <sc-for list="{{ exFilter }}" as="c" hint-placeholder-count="4">
               <button onClick="{{ c.onClick }}" style="border:1px solid;border-radius:22px;padding:8px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer; background: {{ c.bg }}; color: {{ c.fg }}; border-color: {{ c.bd }}">{{ c.label }}</button>
             </sc-for>
+            <div style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--hair);border-radius:999px;padding:9px 15px;margin-left:auto;flex:1 1 220px;max-width:300px;box-shadow:var(--shadow)">
+              <span style="flex:none;width:15px;height:15px;color:var(--muted);display:flex">{{ iconSearch }}</span>
+              <input value="{{ exQ }}" onInput="{{ onExQ }}" placeholder="Пошук: компанія, товар, країна…" style="border:none;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%"/>
+            </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px">
             <sc-for list="{{ exhibitors }}" as="e" hint-placeholder-count="4">
-              <div style="background:var(--card);border:1px solid var(--hair);border-radius:24px;padding:18px 20px;display:flex;flex-direction:column;gap:11px">
-                <div style="display:flex;align-items:center;justify-content:space-between"><div style="font-size:15px;font-weight:800;color:var(--ink)">{{ e.name }}</div><span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:20px;background:var(--accent-soft);color:var(--accent-ink)">{{ e.match }} збіг</span></div>
-                <div style="font-size:12.5px;color:var(--muted);font-weight:600">{{ e.focus }} · стенд {{ e.stand }}</div>
-                <div style="font-size:13px;color:var(--ink2);line-height:1.5">{{ e.brief }}</div>
-                <button onClick="{{ e.onDraft }}" style="margin-top:4px;border:1px solid #F2A73B;background:#FDF3E2;color:#B06E13;border-radius:10px;padding:9px;font-family:inherit;font-weight:800;font-size:12.5px;cursor:pointer">Чернетка листа про зустріч</button>
+              <div style="background:var(--card);border:1px solid var(--hair);border-radius:24px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+                  <button onClick="{{ e.onOpen }}" title="Відкрити картку" style="text-align:left;border:none;background:none;padding:0;cursor:pointer;font-family:inherit;font-size:15.5px;font-weight:800;color:var(--ink);line-height:1.25" style-hover="color:var(--accent-ink)">{{ e.name }}</button>
+                  <span style="flex:none;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;background:linear-gradient(135deg,#34C759,#0d9488);color:#fff;white-space:nowrap">🇮🇹 {{ e.stand }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted);font-weight:600">
+                  <span>{{ e.focus }}</span>
+                  <sc-if value="{{ e.status }}" hint-placeholder-val="{{ false }}"><span style="font-weight:700; color: {{ e.statusColor }}">· {{ e.status }}</span></sc-if>
+                </div>
+                <div style="font-size:12.5px;color:var(--ink2);line-height:1.5">{{ e.brief }}</div>
+                <sc-if value="{{ e.hasPurpose }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--muted);background:var(--card2);border-radius:9px;padding:7px 10px;line-height:1.45"><b style="color:var(--accent-ink)">Мета:</b> {{ e.purpose }}</div></sc-if>
+                <div style="font-size:11.5px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums">{{ e.metaLine }}</div>
+                <button onClick="{{ e.onPrep }}" style="margin-top:4px;border:none;background:var(--accent);color:#fff;border-radius:11px;padding:10px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-hover="filter:brightness(1.07)"><span style="width:15px;height:15px;display:flex">{{ iconChat }}</span>Підготувати до зустрічі</button>
               </div>
             </sc-for>
           </div>
+          <sc-if value="{{ exEmpty }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;color:var(--muted);padding:50px 0;font-size:15px">Нічого не знайдено за цими умовами.</div></sc-if>
         </div>
       </sc-if>
 
@@ -876,6 +971,7 @@ class Component extends DCLogic {
       openPos: 0,
       route: "dashboard",
       chatMessages: [], chatInput: "", chatTyping: false, chatSummary: "", chatCompacting: false, chatStatus2: "", chatFiles: [], chatDragOver: false,
+      chats: [], activeChatId: null, historyOpen: false, histQ: "", histEditId: null, histEditVal: "",
       collapsed: false,
       mascotEnabled: props.showMascot !== false,
       mood: "neutral",
@@ -888,12 +984,12 @@ class Component extends DCLogic {
       sQ:"", sType:"", sStatus:"", sExpo:"", sPrices:"", sSort:"az",
       selKey:null, selProdI:0, comboQ:"", comboOpen:false, tblOpen:false,
       rfqProd:null, rfqProdQ:"", rfqProdOpen:false, rfqAud:"gave", rfqCoQ:"",
-      rfqCart:{}, rfqExpand:{}, rfqContact:{}, rfqModal:false, rfqSendIdx:0,
+      rfqCart:{}, rfqExpand:{}, rfqContact:{}, rfqModal:false, rfqSendIdx:0, rfqExpoOnly:false, rfqEmailOnly:false,
       rfVol:"", rfPrice:"", rfInco:"FOB", rfSpec:"", rfLead:"", rfCoa:true,
       rfSubject:"", rfSig:"Procurement Team\nAlliance Group 95", rfBodyEdit:{},
       rfqTab:"new",
       user:this.loadUser(), authMode:"login", authName:"", authEmail:"", authCompany:"", authPass:"", authErr:"",
-      exFilter: "Усі",
+      exFilter: "Усі", exQ:"",
       mails: this.MAILS.map(m=>({...m})),
       rzCur:null, rzCat:"all", rzLevel:1, rzScore:0, rzMascot:"",
       rzBest:{}, rzStats:{played:0,mins:0,wins:0}, rzStreak:4,
@@ -911,7 +1007,7 @@ class Component extends DCLogic {
 
   componentDidMount(){
     try{ const s=JSON.parse(localStorage.getItem("gp_rest_v2")||"{}"); if(s.best||s.stats) this.setState({rzBest:s.best||{},rzStats:s.stats||this.state.rzStats,rzStreak:s.streak||4,vol:s.vol==null?45:s.vol,sfx:s.sfx!==false}); }catch(e){}
-    if(this.state.route==="dashboard") this.seedChat();
+    this.setState({chats:this.loadChats()});
     this._compactTimer = setInterval(()=>{ this.maybeCompact(true); }, 30*60*1000);
     // File attachments: clipboard paste + drag&drop anywhere on the chat screen.
     this._onPaste=(e)=>{ if(this.state.route!=="dashboard") return; const cd=e.clipboardData; if(cd&&cd.files&&cd.files.length){ this.addFiles(cd.files); } };
@@ -1081,6 +1177,7 @@ class Component extends DCLogic {
   contactEmail(c,key){ var sel=this.state.rfqContact[key]; if(sel) return sel; var pc=this.primaryContact(c); return pc?(pc.email||(pc.emails_alt&&pc.emails_alt[0])||""):""; }
   lastQuoteFor(c,prod){ var g=(c.prices||[]).filter(function(x){return x.product===prod;})[0]; if(!g) return null; var best=null,bt=-1; g.rows.forEach(function(r){ if(typeof r.price==="number"){ var t=Date.parse(r.date)||0; if(t>=bt){bt=t;best=r;} } }); return best?{price:best.price,cur:g.cur,unit:g.unit,date:best.date}:null; }
 
+  hasEmail(c){ var pc=this.primaryContact(c); return !!(pc&&(pc.email||(pc.emails_alt&&pc.emails_alt[0]))); }
   rfqAudienceList(){
     var S=this.state, prod=S.rfqProd, cs=this.SITE.companies, self=this;
     var q=(S.rfqCoQ||"").trim().toLowerCase();
@@ -1089,10 +1186,14 @@ class Component extends DCLogic {
     else if(S.rfqAud==="worked"){ base = cs.filter(function(c){return self.worked(c);}); }
     else if(S.rfqAud==="new"){ base = prod? cs.filter(function(c){return !self.gaveProduct(c,prod);}) : cs.slice(); }
     else { base = cs.slice(); } // dialogue = all
+    if(S.rfqExpoOnly) base=base.filter(function(c){return !!c.exhibit;});
+    if(S.rfqEmailOnly) base=base.filter(function(c){return self.hasEmail(c);});
     if(q) base=base.filter(function(c){ var hay=(c.name+" "+(c.country||"")+" "+(c.people||[]).map(function(p){return p.name+" "+(p.email||"");}).join(" ")).toLowerCase(); return hay.indexOf(q)>=0; });
-    base.sort(function(a,b){return (a.rank||9999)-(b.rank||9999);});
+    base.sort(function(a,b){return (b.msgs||0)-(a.msgs||0);});
     return base.slice(0,80);
   }
+  rfqSelectAll(){ var list=this.rfqAudienceList(); var allSel=list.length>0 && list.every(function(c){return this.state.rfqCart[c.key];},this); var cart=Object.assign({},this.state.rfqCart); list.forEach(function(c){ if(allSel) delete cart[c.key]; else cart[c.key]=true; }); this.setState({rfqCart:cart}); }
+  rfqClearCart(){ this.setState({rfqCart:{}}); }
 
   rfqLetter(c){
     var S=this.state, prod=S.rfqProd||"the product", cas="";
@@ -1165,6 +1266,7 @@ class Component extends DCLogic {
         others: others
       };
     });
+    var allShownSelected = list.length>0 && list.every(function(c){return !!S.rfqCart[c.key];});
     var cartCos=this.rfqCartCompanies();
     var cur=cartCos[S.rfqSendIdx]||cartCos[0]||null;
     var cartList=cartCos.map(function(c){ return {key:c.key, name:c.name, email:self.contactEmail(c,c.key), onRemove:function(){self.toggleCart(c.key);}}; });
@@ -1181,9 +1283,18 @@ class Component extends DCLogic {
       onRfqProdInput:function(e){self.setState({rfqProdOpen:true,rfqProdQ:e.target.value});},
       onRfqProdBlur:function(){setTimeout(function(){self.setState({rfqProdOpen:false});},180);},
       rfqAudChips:audChips,
+      rfqExpoOnly:!!S.rfqExpoOnly, onRfqExpoToggle:function(){self.setState({rfqExpoOnly:!self.state.rfqExpoOnly});},
+      rfqExpoBg:S.rfqExpoOnly?"linear-gradient(135deg,#34C759,#0d9488)":"var(--card)", rfqExpoFg:S.rfqExpoOnly?"#fff":"var(--ink)", rfqExpoBd:S.rfqExpoOnly?"transparent":"var(--hair)",
+      rfqEmailOnly:!!S.rfqEmailOnly, onRfqEmailToggle:function(){self.setState({rfqEmailOnly:!self.state.rfqEmailOnly});},
+      rfqEmailBg:S.rfqEmailOnly?"var(--accent)":"var(--card)", rfqEmailFg:S.rfqEmailOnly?"#fff":"var(--ink)", rfqEmailBd:S.rfqEmailOnly?"var(--accent)":"var(--hair)",
       rfqCoQ:S.rfqCoQ||"", onRfqCoQ:function(e){self.setState({rfqCoQ:e.target.value});},
       rfqCompanies:companies, rfqCount:companies.length, rfqEmpty:companies.length===0,
+      rfqShownCount:self.n2(companies.length),
+      rfqAllSelected:allShownSelected, onRfqSelectAll:function(){self.rfqSelectAll();},
+      rfqSelectAllLabel:allShownSelected?"Зняти виділення":("Обрати всіх · "+companies.length),
+      onRfqClearCart:function(){self.rfqClearCart();},
       rfqCartN:Object.keys(S.rfqCart).length,
+      rfqComposeOpacity:Object.keys(S.rfqCart).length?"1":".5",
       onRfqCompose:function(){self.openRfqModal();},
       // modal
       rfqModal:S.rfqModal, rfqModalCo:cur?cur.name:"", rfqSendIdx:S.rfqSendIdx, rfqSendTotal:cartCos.length,
@@ -1295,7 +1406,6 @@ class Component extends DCLogic {
     if(route==="monitoring"){ this.say("loading",msg,{bubble:true}); if(this._t)clearTimeout(this._t); this._t=setTimeout(()=>{ this.say("happy","Готово! Дві ціни потребують твого підтвердження.",{bubble:true}); this.setState({monitorStatus:"Розпізнано 2 нові листи · чекають на підтвердження."}); },1400); }
     else this.say(mood,msg,{bubble:true});
     if(route!=="rest") this.stopSnake();
-    if(route==="dashboard") this.seedChat();
   }
 
   // ---------- ПІГУЛЬКІН CHAT ----------
@@ -1304,11 +1414,11 @@ class Component extends DCLogic {
   // ходить у справжній бекенд. Поки що — чесний плейсхолдер, без вигаданих даних.
   get PIGULKIN_API(){ return (typeof window!=="undefined" && window.GP_PIGULKIN_API) || ""; }
 
-  chatGreeting(){
-    const n = this.SITE.companies.length;
-    return "Привіт! Я Пігулькін — ваш AI-помічник по закупівлях.\n"+
-      "У мене під рукою база на "+this.n2(n)+" постачальників з контактами, цінами та історією RFQ. "+
-      "Запитайте, наприклад, хто пропонує потрібну субстанцію, як рухалися ціни або кому надіслати запит.";
+  chatHeroTitle(){ return "Про що поговоримо?"; }
+  chatHeroSub(){
+    const n=this.SITE.companies.length;
+    return "Я Пігулькін — AI-помічник із доступом до вашої бази на "+this.n2(n)+" постачальників: "+
+      "ціни, контакти, історія RFQ та підготовка до виставок. Запитуйте.";
   }
   chatSuggestions(){
     return [
@@ -1318,14 +1428,36 @@ class Component extends DCLogic {
       "Кому надіслати RFQ на ібупрофен?"
     ];
   }
-  seedChat(){
-    if(!this.state.chatMessages.length)
-      this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}]});
+  seedChat(){ /* new chat shows a centered hero (mascot + prompt) instead of a seeded greeting bubble */ }
+
+  // ---------- chat history (localStorage) ----------
+  CHATS_KEY(){ return "gp_chats_v1"; }
+  loadChats(){ try{ const raw=localStorage.getItem(this.CHATS_KEY()); const a=raw?JSON.parse(raw):[]; return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+  persistChats(chats){ try{ localStorage.setItem(this.CHATS_KEY(), JSON.stringify(chats||[])); }catch(e){} }
+  newChatId(){ return "c"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36); }
+  chatTitleFrom(msgs){ const u=(msgs||[]).find(m=>m.role==="user"); if(!u) return "Нова розмова"; let t=String(u.text||"").split("\n")[0].replace(/^📎.*$/,"").trim(); if(!t) t="Нова розмова"; return t.length>46?t.slice(0,46)+"…":t; }
+  saveCurrentChat(){
+    const S=this.state; const msgs=S.chatMessages||[];
+    if(!msgs.some(m=>m.role==="user")) return;   // don't save empty/greeting-only chats
+    const id=S.activeChatId||this.newChatId();
+    const rec={id, title:this.chatTitleFrom(msgs), messages:msgs, summary:S.chatSummary||"", updated:Date.now()};
+    const chats=(this.state.chats||[]).slice();
+    const i=chats.findIndex(c=>c.id===id);
+    if(i>=0) chats[i]=rec; else chats.unshift(rec);
+    chats.sort((a,b)=>(b.updated||0)-(a.updated||0));
+    this.persistChats(chats);
+    this.setState({chats, activeChatId:id});
   }
+  newChat(){ this.saveCurrentChat(); this.setState({activeChatId:this.newChatId(), chatMessages:[], chatInput:"", chatTyping:false, chatSummary:"", chatStatus2:"", chatFiles:[], historyOpen:false, histEditId:null}); }
+  openChat(id){ this.saveCurrentChat(); const c=(this.state.chats||[]).find(x=>x.id===id); if(!c) return; this.setState({route:"dashboard", activeChatId:id, chatMessages:(c.messages||[]).slice(), chatSummary:c.summary||"", chatInput:"", chatTyping:false, chatStatus2:"", chatFiles:[], historyOpen:false, histEditId:null}, ()=>this.scrollChat()); }
+  deleteChat(id){ const chats=(this.state.chats||[]).filter(c=>c.id!==id); this.persistChats(chats); if(id===this.state.activeChatId){ this.setState({chats, histEditId:null},()=>this.newChat()); } else { this.setState({chats, histEditId:null}); } }
+  startRename(id){ const c=(this.state.chats||[]).find(x=>x.id===id); this.setState({histEditId:id, histEditVal:c?c.title:""}); }
+  commitRename(){ const id=this.state.histEditId; if(!id){ return; } const nt=String(this.state.histEditVal||"").trim(); const chats=(this.state.chats||[]).map(x=>x.id===id?Object.assign({},x,{title:nt||x.title}):x); this.persistChats(chats); this.setState({chats, histEditId:null, histEditVal:""}); }
+  toggleHistory(){ this.setState({historyOpen:!this.state.historyOpen, histEditId:null}); }
   scrollChat(){
     try{ const el=document.getElementById("gpChatScroll"); if(el) el.scrollTop=el.scrollHeight; }catch(e){}
   }
-  resetChat(){ this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}],chatInput:"",chatTyping:false,chatSummary:"",chatStatus2:"",chatFiles:[]}); }
+  resetChat(){ this.newChat(); }
   onChatKey(e){ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); this.sendChat(); } }
   sendChat(){
     const text=(this.state.chatInput||"").trim();
@@ -1334,12 +1466,12 @@ class Component extends DCLogic {
     const label=(text || "(файли для контексту)") + (files.length?("\n\n📎 "+files.map(function(f){return f.name;}).join(", ")):"");
     const msgs=this.state.chatMessages.concat([{role:"user",text:label}]);
     const attachments=files.map(function(f){return {kind:f.kind,name:f.name,media_type:f.media_type,data:f.data};});
-    this.setState({chatMessages:msgs, chatInput:"", chatTyping:true, chatStatus2:"", chatFiles:[]}, ()=>this.scrollChat());
+    this.setState({chatMessages:msgs, chatInput:"", chatTyping:true, chatStatus2:"", chatFiles:[]}, ()=>{ this.scrollChat(); this.saveCurrentChat(); });
     const api=this.PIGULKIN_API;
     if(api){ this.streamChat(api, msgs, attachments); }
     else {
       this.pigulkinReply(msgs).then(reply=>{
-        this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:reply}]), chatTyping:false}, ()=>this.scrollChat());
+        this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:reply}]), chatTyping:false}, ()=>{ this.scrollChat(); this.saveCurrentChat(); });
       });
     }
   }
@@ -1356,7 +1488,7 @@ class Component extends DCLogic {
     fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body}).then((resp)=>{
       if(!resp.ok || !resp.body){ throw new Error("stream http "+resp.status); }
       const reader=resp.body.getReader(); const dec=new TextDecoder(); let buf="";
-      const finish=()=>{ let cm=this.state.chatMessages.slice(); const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{streaming:false}); } this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>{ this.scrollChat(); this.maybeCompact(false); }); };
+      const finish=()=>{ let cm=this.state.chatMessages.slice(); const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{streaming:false}); } this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>{ this.scrollChat(); this.saveCurrentChat(); this.maybeCompact(false); }); };
       const pump=()=>reader.read().then(({done,value})=>{
         if(done){ finish(); return; }
         buf+=dec.decode(value,{stream:true});
@@ -1381,20 +1513,18 @@ class Component extends DCLogic {
   maybeCompact(force){
     const api=this.PIGULKIN_API; if(!api) return;
     const S=this.state; if(S.chatCompacting) return;
-    const msgs=S.chatMessages||[]; if(msgs.length<2) return;
-    const body=msgs.slice(1); // keep the greeting at index 0
-    const KEEP=6;
-    if(body.length<=KEEP) return;
-    if(!force && body.length<14) return;
-    const toCompact=body.slice(0, body.length-KEEP).filter(function(m){return !m.compacted;});
-    const keep=body.slice(body.length-KEEP);
+    const msgs=S.chatMessages||[]; const KEEP=6;
+    if(msgs.length<=KEEP+1) return;
+    if(!force && msgs.length<14) return;
+    const toCompact=msgs.slice(0, msgs.length-KEEP).filter(function(m){return !m.compacted;});
+    const keep=msgs.slice(msgs.length-KEEP);
     if(toCompact.length<2) return;
     this.setState({chatCompacting:true});
     fetch(api+"/compact",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({messages:toCompact.map(function(m){return {role:m.role,text:m.text};}), summary:S.chatSummary||""})})
       .then(function(r){return r.json();}).then((d)=>{
         const note={role:"bot",text:"🗜 Попередню частину розмови згорнуто, щоб не перевантажувати контекст і не витрачати зайві токени.",compacted:true};
-        this.setState({chatSummary:(d&&d.summary)||S.chatSummary||"", chatMessages:[msgs[0], note].concat(keep), chatCompacting:false},()=>this.scrollChat());
+        this.setState({chatSummary:(d&&d.summary)||S.chatSummary||"", chatMessages:[note].concat(keep), chatCompacting:false},()=>{ this.scrollChat(); this.saveCurrentChat(); });
       }).catch(()=>this.setState({chatCompacting:false}));
   }
   // Fallback when no backend is configured (window.GP_PIGULKIN_API empty).
@@ -2176,6 +2306,7 @@ class Component extends DCLogic {
       coffee:["0 0 512 512","M88 0C74.7 0 64 10.7 64 24c0 38.9 23.4 59.4 39.1 73.1l1.1 1C120.5 112.3 128 119.9 128 136c0 13.3 10.7 24 24 24s24-10.7 24-24c0-38.9-23.4-59.4-39.1-73.1l-1.1-1C119.5 47.7 112 40.1 112 24c0-13.3-10.7-24-24-24zM32 192c-17.7 0-32 14.3-32 32L0 416c0 53 43 96 96 96l192 0c53 0 96-43 96-96l16 0c61.9 0 112-50.1 112-112s-50.1-112-112-112l-48 0L32 192zm352 64l16 0c26.5 0 48 21.5 48 48s-21.5 48-48 48l-16 0 0-96zM224 24c0-13.3-10.7-24-24-24s-24 10.7-24 24c0 38.9 23.4 59.4 39.1 73.1l1.1 1C232.5 112.3 240 119.9 240 136c0 13.3 10.7 24 24 24s24-10.7 24-24c0-38.9-23.4-59.4-39.1-73.1l-1.1-1C231.5 47.7 224 40.1 224 24z"],
       search:["0 0 512 512","M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"],
       bell:["0 0 448 512","M224 0c-17.7 0-32 14.3-32 32l0 19.2C119 66 64 130.6 64 208l0 18.8c0 47-17.3 92.4-48.5 127.6l-7.4 8.3c-8.4 9.4-10.4 22.9-5.3 34.4S19.4 416 32 416l384 0c12.6 0 24-7.4 29.2-18.9s3.1-25-5.3-34.4l-7.4-8.3C401.3 319.2 384 273.9 384 226.8l0-18.8c0-77.4-55-142-128-156.8L256 32c0-17.7-14.3-32-32-32zm45.3 493.3c12-12 18.7-28.3 18.7-45.3l-64 0-64 0c0 17 6.7 33.3 18.7 45.3s28.3 18.7 45.3 18.7s33.3-6.7 45.3-18.7z"],
+      history:["0 0 512 512","M75 75L41 41C25.9 25.9 0 36.6 0 57.9L0 168c0 13.3 10.7 24 24 24l110.1 0c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zM256 128c-13.3 0-24 10.7-24 24l0 104c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65 0-94.1c0-13.3-10.7-24-24-24z"],
       chevR:["0 0 320 512","M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z"],
       chevL:["0 0 320 512","M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z"],
       close:["0 0 384 512","M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"],
@@ -2262,6 +2393,15 @@ class Component extends DCLogic {
   typeChip(t){ if(t==="Завод") return {bg:"var(--accent-soft)",fg:"var(--accent-ink)"}; if(t==="Трейдер") return {bg:"rgba(242,167,59,.18)",fg:"#B4681A"}; return {bg:"var(--card2)",fg:"var(--muted)"}; }
   statusColor(s){ s=s||""; if(/замовлення/.test(s)) return "var(--accent-ink)"; if(/Активн/.test(s)) return "#2a8fb0"; if(/Зависл/.test(s)) return "#B4681A"; if(/Відмов/.test(s)) return "#C64A72"; return "var(--muted)"; }
   openCompany(key){ const c=this.SITE.companies.find(x=>x.key===key); let best=0; if(c&&c.prices&&c.prices.length){ c.prices.forEach((g,i)=>{ if(g.n>c.prices[best].n) best=i; }); } this.setState({selKey:key, selProdI:best, comboQ:"", comboOpen:false, tblOpen:false}); }
+
+  // Exhibitions -> chat: start a fresh chat and ask Пігулькін for a full meeting brief.
+  prepMeetingInChat(name){
+    const q="Підготуй мене до зустрічі на виставці CPHI Worldwide Milan 2026 з постачальником «"+name+"». "+
+      "Зроби повний бриф: хто вони й чим займаються, наші сильні сторони, цільова ціна з бенчмарку, "+
+      "історія цін і замовлень, відкриті питання та аргументи для переговорів.";
+    if(typeof this.newChat==="function") this.newChat();
+    this.setState({route:"dashboard", selKey:null, chatInput:q}, ()=>{ this.sendChat(); });
+  }
   selectProduct(i){ this.setState({selProdI:i, comboOpen:false, comboQ:""}); }
 
   buildSiteChart(g){
@@ -2423,7 +2563,7 @@ class Component extends DCLogic {
   renderVals(){
     const S=this.state, self=this;
     const routes=["dashboard","suppliers","rfq","monitoring","quality","exhibitions","rest"];
-    const navMeta=[["dashboard","Чат з Пігулькіним","chat",null],["suppliers","Постачальники","box",null],["rfq","RFQ-розсилки","mail","2"],["monitoring","Моніторинг цін","chart",S.mails.filter(m=>m.flagged).length||null],["quality","Якість і переговори","shield","1"],["exhibitions","Виставки","star",null],["rest","Зона відпочинку","coffee",null]];
+    const navMeta=[["dashboard","Чат з Пігулькіним","chat",null],["suppliers","Постачальники","box",null],["rfq","RFQ-розсилки","mail",null],["monitoring","Моніторинг цін","chart",null],["quality","Якість і переговори","shield",null],["exhibitions","Виставки","star",null],["rest","Зона відпочинку","coffee",null]];
     const navItems=navMeta.map(([r,l,ic,badge])=>({label:l,icon:this.icon(ic,S.route===r?"#0E2A36":"#7FB4A6"),bg:S.route===r?"var(--accent)":"transparent",fg:S.route===r?"#062018":"#CFE4DE",hover:S.route===r?"background:#33BEA9;color:#052017":"background:rgba(255,255,255,.09);color:#EAF6F2",badge,showBadge:!!badge&&!S.collapsed,showDot:!!badge&&S.collapsed,onClick:()=>this.nav(r),tour:"nav-"+r}));
 
     const titles={dashboard:["Чат з Пігулькіним","AI-помічник закупівельника з доступом до вашої бази"],suppliers:["Постачальники","База постачальників, цін і документів"],rfq:["RFQ-розсилки","Запити комерційних пропозицій і порівняння"],monitoring:["Моніторинг цін","Автоматичний розбір цін із пошти"],quality:["Якість і переговори","Претензії та переговорна позиція"],exhibitions:["Виставки","Підготовка до профільних виставок"],rest:["Зона відпочинку","Психологічне розвантаження відділу"]};
@@ -2494,9 +2634,35 @@ class Component extends DCLogic {
     const specRows=[{param:"Assay (HPLC), %",norm:"99.0–101.0",fact:"98.6",bad:true},{param:"Втрата при висушуванні, %",norm:"≤ 0.5",fact:"0.3",bad:false},{param:"Важкі метали, ppm",norm:"≤ 10",fact:"7",bad:false},{param:"Залишкові розчинники",norm:"ICH Q3C",fact:"у межах",bad:false}].map(r=>({...r,status:r.bad?"Відхилення":"Норма",stBg:r.bad?"#FDECEF":"var(--accent-soft)",stFg:r.bad?"#C64A72":"#0F6E56"}));
     const negOptions=[{title:"Замінна партія",text:"Вимагати заміну партії DFS/126060314 з новим COA — попередні партії Aarti були в нормі."},{title:"Знижка за assay",text:"Прийняти партію зі знижкою за фактичний assay 98.6% для некритичного застосування."},{title:"Притримати оплату",text:"Призупинити оплату до надання фото бочок і Packing List (прострочені з 31.07) — потрібні для митниці."}];
 
-    const exFilters=["Усі","API / субстанції","Капсули / ексципієнти","Ветеринарія"].map(c=>({label:c,onClick:()=>this.setState({exFilter:c}),bg:S.exFilter===c?"#0F6E56":"#fff",fg:S.exFilter===c?"#fff":"#0E2A36",bd:S.exFilter===c?"#0F6E56":"#E1E8E6"}));
-    const exAll=[{name:"Divi's Laboratories",focus:"API · Завод",tag:"API / субстанції",stand:"Hall 2 · A2",match:"96%",brief:"Карведилол — уточнити ціну й кінцевого клієнта. Один із ключових заводів у базі."},{name:"Aarti Drugs Ltd",focus:"API · Завод",tag:"API / субстанції",stand:"Hall 2 · F16",match:"94%",brief:"Диклофенак, німесулід. Є історія замовлень — підтвердити $9.70 і закрити питання з документами."},{name:"EUROAPI France",focus:"API · Завод",tag:"API / субстанції",stand:"Hall 3 · A1",match:"90%",brief:"Антибіотики, EU-GMP. Прямий європейський виробник для регульованих ринків."},{name:"Ipca Laboratories",focus:"API · Завод",tag:"API / субстанції",stand:"Hall 5 · F1",match:"89%",brief:"Алопуринол, метоклопрамід. Порівняти з поточними цінами по цих позиціях."},{name:"Hubei Biocause Heilen",focus:"API · Завод",tag:"API / субстанції",stand:"Hall 3 · J87",match:"87%",brief:"Ібупрофен. Ціна зросла на 6% — з'ясувати причину й домовитись про обсяг."},{name:"BTP Pharmaceutical",focus:"Капсули · Завод",tag:"Капсули / ексципієнти",stand:"Hall 2 · K71",match:"82%",brief:"Порожні капсули — розширення пакувальних матеріалів."},{name:"Corel Pharma Chem",focus:"Ексципієнти",tag:"Капсули / ексципієнти",stand:"Hall 1 · B50",match:"80%",brief:"Ексклюзив по акриполу — обговорити умови дистрибуції."},{name:"A.H.A. International",focus:"Трейдер",tag:"Ветеринарія",stand:"Hall 1 · H20",match:"78%",brief:"Наші ветеринарні позиції. Трейдер — перевірити маржу й прямі альтернативи."}];
-    const exhibitors=exAll.filter(e=>S.exFilter==="Усі"||e.tag===S.exFilter).map(e=>({...e,onDraft:()=>this.say("encouraging",`Чернетку листа для «${e.name}» готую…`,{bubble:true,toast:true})}));
+    // ---- exhibitions: real CPHI Milan 2026 exhibitors from the DB ----
+    const exList=this.SITE.companies.filter(c=>c.exhibit);
+    const exTypeOf=c=>c.type||"Інше";
+    const exFilterVal=S.exFilter||"Усі";
+    const exQ=(S.exQ||"").trim().toLowerCase();
+    const exTypes=["Усі"].concat(Array.from(new Set(exList.map(exTypeOf))).sort());
+    const exFilters=exTypes.map(c=>({label:c==="Усі"?("Усі · "+exList.length):c,onClick:()=>this.setState({exFilter:c}),bg:exFilterVal===c?"#0F6E56":"#fff",fg:exFilterVal===c?"#fff":"#0E2A36",bd:exFilterVal===c?"#0F6E56":"#E1E8E6"}));
+    const exShown=exList.filter(c=>{
+      if(exFilterVal!=="Усі" && exTypeOf(c)!==exFilterVal) return false;
+      if(exQ){ const hay=(c.name+" "+(c.country||"")+" "+(c.products||[]).join(" ")).toLowerCase(); if(hay.indexOf(exQ)<0) return false; }
+      return true;
+    }).sort((a,b)=>(b.msgs||0)-(a.msgs||0));
+    const exReady=exList.filter(c=>(c.who&&c.who.summary)||(c.prices&&c.prices.length)).length;
+    const exhibitors=exShown.map(c=>{
+      const prod=(c.products||[]).slice(0,3).join(", ");
+      const nq=(c.prices||[]).reduce((s,g)=>s+(g.n||0),0);
+      const summary=(c.who&&c.who.summary)?String(c.who.summary):"";
+      const brief=summary?(summary.length>160?summary.slice(0,160)+"…":summary):(prod?("Товари: "+prod):"Профіль формується — Пігулькін збере бриф із бази.");
+      return {key:c.key, name:c.name,
+        stand:"Hall "+c.exhibit.hall+" · стенд "+c.exhibit.stand,
+        focus:[c.type,c.country].filter(Boolean).join(" · "),
+        purpose:c.exhibit.purpose||"",
+        brief:brief,
+        metaLine:this.n2(c.msgs||0)+" листів · "+this.n2(c.threads||0)+" тем · "+this.n2(nq)+" котирувань",
+        status:c.status||"", statusColor:this.statusColor(c.status),
+        hasPurpose:!!c.exhibit.purpose,
+        onOpen:()=>this.openCompany(c.key),
+        onPrep:()=>this.prepMeetingInChat(c.name)};
+    });
 
 
 
@@ -2519,6 +2685,18 @@ class Component extends DCLogic {
       };
     });
     const chatHasText=!!(S.chatInput||"").trim();
+    const chatEmpty=(S.chatMessages||[]).length===0;
+    const nowTs=Date.now();
+    const relTime=(ts)=>{ if(!ts)return""; const d=Math.floor((nowTs-ts)/1000); if(d<60)return"щойно"; if(d<3600)return Math.max(1,Math.floor(d/60))+" хв тому"; if(d<86400)return Math.floor(d/3600)+" год тому"; const dd=new Date(ts),p=n=>String(n).padStart(2,"0"); return p(dd.getDate())+"."+p(dd.getMonth()+1)+"."+dd.getFullYear(); };
+    const hq=(S.histQ||"").trim().toLowerCase();
+    const histList=(S.chats||[]).filter(c=>!hq||String(c.title||"").toLowerCase().indexOf(hq)>=0).map(c=>({
+      id:c.id, title:c.title||"Розмова", time:relTime(c.updated),
+      active:c.id===S.activeChatId, editing:S.histEditId===c.id, notEditing:S.histEditId!==c.id,
+      rowBg:c.id===S.activeChatId?"var(--accent-soft)":"transparent",
+      onOpen:()=>this.openChat(c.id),
+      onRename:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.startRename(c.id); },
+      onDelete:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.deleteChat(c.id); }
+    }));
     const chatSuggest=this.chatSuggestions().map(q=>({label:q,onClick:()=>this.setState({chatInput:q})}));
     const chatFilesView=(S.chatFiles||[]).map((f,i)=>{ const isImg=f.kind==="image"&&f.data; return {isImg:!!isImg, thumb:isImg?("data:"+(f.media_type||"image/png")+";base64,"+f.data):"", pad:isImg?"4px 8px 4px 4px":"6px 8px 6px 12px", label:isImg?f.name:(this.fileIcon(f.kind)+" "+f.name), onRemove:()=>this.removeFile(i)}; });
 
@@ -2567,13 +2745,22 @@ class Component extends DCLogic {
       chatStatus:S.chatTyping?(S.chatStatus2||"друкує…"):"Онлайн · готовий допомогти",
       chatDot:S.chatTyping?"#F2A73B":"var(--accent)",
       chatTyping:!!S.chatTyping,
-      chatShowSuggest:(S.chatMessages||[]).length<=1 && !S.chatTyping,
+      chatEmpty, chatNotEmpty:!chatEmpty,
+      chatShowSuggest: chatEmpty && !chatHasText && !S.chatTyping,
       chatSuggest,
+      chatHeroTitle:this.chatHeroTitle(), chatHeroSub:this.chatHeroSub(), chatHeroMascot:this.buildMascot("happy",92),
+      historyOpen:!!S.historyOpen, onToggleHistory:()=>this.toggleHistory(), onHistClose:()=>this.setState({historyOpen:false}),
+      onNewChat:()=>this.newChat(),
+      histList, histEmpty:histList.length===0, histQ:S.histQ||"", onHistQ:(e)=>this.setState({histQ:e.target.value}),
+      histEditVal:S.histEditVal||"", onHistEditInput:(e)=>this.setState({histEditVal:e.target.value}), onHistEditCommit:()=>this.commitRename(),
+      onHistEditKey:(e)=>{ if(e.key==="Enter"){e.preventDefault();this.commitRename();} else if(e.key==="Escape"){this.setState({histEditId:null});} },
       chatInput:S.chatInput||"", onChatInput:(e)=>this.setState({chatInput:e.target.value}),
       onChatKey:(e)=>this.onChatKey(e), onChatSend:()=>this.sendChat(), onChatReset:()=>this.resetChat(),
       chatSendBg:((chatHasText||(S.chatFiles||[]).length)&&!S.chatTyping)?"var(--accent-grad)":"#B8CCC6",
       iconSend:h("span",{style:{width:20,height:20,display:"flex"}}, this.icon("send")),
       iconClip:h("span",{style:{width:19,height:19,display:"flex"}}, this.icon("clip")),
+      iconChat:h("span",{style:{width:15,height:15,display:"flex"}}, this.icon("chat")),
+      iconHistory:h("span",{style:{width:14,height:14,display:"flex"}}, this.icon("history")),
       chatFilesView, chatHasFiles:(S.chatFiles||[]).length>0,
       onAttachClick:()=>this.onAttachClick(), onFilePick:(e)=>this.onFilePick(e),
       chatComposerBd:S.chatDragOver?"var(--accent)":"var(--hair)",
@@ -2609,7 +2796,8 @@ class Component extends DCLogic {
       monitorMascot:this.buildMascot(S.route==="monitoring"?S.mood:"loading",46), monitorStatus:S.monitorStatus, mailPending:S.mails.filter(m=>m.flagged).length, mails,
       monSearch:S.mQ||"", onMonSearch:(e)=>this.setState({mQ:e.target.value,mSel:null,mMore:false}), monBody:this.buildMonitoring(), monList:!S.mSel,
       specRows, negOptions,
-      exFilter:exFilters, exhibitors,
+      exFilter:exFilters, exhibitors, exCount:this.n2(exList.length), exReady:this.n2(exReady), exShownCount:this.n2(exShown.length), exEmpty:exShown.length===0,
+      exQ:S.exQ||"", onExQ:(e)=>this.setState({exQ:e.target.value}),
 
       ...this.rzVals(),
 
