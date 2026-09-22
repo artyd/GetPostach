@@ -80,9 +80,11 @@ def base_stats() -> dict:
 def main() -> None:
     transport = os.getenv("MCP_TRANSPORT", "stdio")
     if transport == "streamable-http":
-        mcp.settings.host = os.getenv("MCP_HOST", "127.0.0.1")
-        mcp.settings.port = int(os.getenv("MCP_PORT", "8931"))
-        mcp.run(transport="streamable-http")
+        mcp.run(
+            transport="streamable-http",
+            host=os.getenv("MCP_HOST", "127.0.0.1"),
+            port=int(os.getenv("MCP_PORT", "8931")),
+        )
     else:
         mcp.run()
 
