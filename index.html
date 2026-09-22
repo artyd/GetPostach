@@ -6,6 +6,21 @@
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  /* Пігулькін chat backend endpoint (window.GP_PIGULKIN_API).
+     Local dev auto-points at the FastAPI backend on :8900.
+     For production, set PROD to your deployed backend, e.g.
+       "https://api.your-domain.com/api/chat"
+     Leave PROD empty to keep the honest "backend not connected" placeholder. */
+  (function () {
+    // Prod: served by Caddy on the same origin (getpostach.alliancegroup95.com:8017),
+    // so a relative path reaches the backend via Caddy's /api/* proxy.
+    var PROD = "/api/chat";
+    var h = location.hostname;
+    var isLocal = h === "localhost" || h === "127.0.0.1" || h === "";
+    window.GP_PIGULKIN_API = isLocal ? "http://localhost:8900/api/chat" : PROD;
+  })();
+</script>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -58,6 +73,11 @@
   @keyframes toastIn{0%{transform:translateX(30px);opacity:0}100%{transform:translateX(0);opacity:1}}
   @keyframes breathe{0%,100%{transform:scale(.72);opacity:.65}45%,55%{transform:scale(1);opacity:1}}
   @keyframes fadeUp{0%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:1}}
+  @keyframes gpBlink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+  .gp-typing{display:inline-flex;gap:5px;align-items:center}
+  .gp-typing i{width:7px;height:7px;border-radius:50%;background:var(--accent-ink);display:block;animation:gpBlink 1.3s infinite ease-in-out}
+  .gp-typing i:nth-child(2){animation-delay:.18s}
+  .gp-typing i:nth-child(3){animation-delay:.36s}
 </style>
 <script src="suppliers-data.js"></script>
 <script src="data/site-data.js"></script>
@@ -167,80 +187,49 @@
 
       <!-- DASHBOARD -->
       <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
-        <div style="width:92%;max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:22px;animation:fadeUp .3s ease">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px">
-            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
-              <button onClick="{{ s.onClick }}" style="text-align:left;border:1px solid var(--hair);background:var(--card);border-radius:24px;padding:20px 22px;cursor:pointer;display:flex;flex-direction:column;gap:8px;font-family:inherit;transition:transform .15s,box-shadow .15s" style-hover="transform:translateY(-3px);box-shadow:0 10px 26px rgba(14,42,54,.09)">
-                <div style="display:flex;align-items:center;gap:10px">
-                  <span style="width:36px;height:36px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center; background: {{ s.iconBg }}; color: {{ s.iconFg }}">{{ s.icon }}</span>
-                  <span style="font-size:12.5px;color:var(--ink2);font-weight:600;line-height:1.25">{{ s.label }}</span>
-                </div>
-                <span style="font-family:var(--sf);font-weight:700;font-size:44px;color:var(--ink);line-height:1">{{ s.value }}</span>
-                <span style="font-size:12.5px;font-weight:600; color: {{ s.subColor }}">{{ s.sub }}</span>
-              </button>
-            </sc-for>
-          </div>
+        <div style="width:92%;max-width:880px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:14px;animation:fadeUp .3s ease">
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
-            <section style="order:2;background:var(--card);border:1px solid var(--hair);border-radius:26px;padding:8px 8px 12px">
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px">
-                <h2 style="margin:0;font-family:var(--sf);font-weight:600;font-size:16px;color:var(--ink)">Потребує уваги</h2>
-                <span style="font-size:12px;color:var(--muted);font-weight:600">сьогодні</span>
-              </div>
-              <div style="display:flex;flex-direction:column">
-                <sc-for list="{{ attention }}" as="a" hint-placeholder-count="5">
-                  <button onClick="{{ a.onClick }}" style="display:flex;align-items:center;gap:14px;padding:13px 16px;border:none;background:transparent;cursor:pointer;font-family:inherit;text-align:left;border-radius:18px;transition:background .14s" style-hover="background:var(--card2)">
-                    <span style="flex:none;width:9px;height:9px;border-radius:50%; background: {{ a.dot }}"></span>
-                    <div style="flex:1;min-width:0">
-                      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.3">{{ a.title }}</div>
-                      <div style="font-size:12.5px;color:var(--ink2);margin-top:2px">{{ a.meta }}</div>
-                    </div>
-                    <span style="flex:none;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:20px; background: {{ a.tagBg }}; color: {{ a.tagFg }}">{{ a.tag }}</span>
-                    <span style="flex:none;width:16px;height:16px;color:#B5C6C1;display:flex">{{ iconChevR }}</span>
-                  </button>
-                </sc-for>
-              </div>
-            </section>
-
-            <div style="order:1;display:flex;flex-direction:column;gap:22px">
-              <section style="background:var(--card);border:1px solid var(--hair);border-radius:26px;padding:8px 8px 12px;display:flex;flex-direction:column">
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px">
-                  <h2 style="margin:0;font-family:var(--sf);font-weight:600;font-size:16px;color:var(--ink)">Рух цін по товарах</h2>
-                  <button onClick="{{ onGoMonitoring }}" style="border:none;background:transparent;color:var(--accent-ink);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Усі товари →</button>
-                </div>
-                <div style="display:flex;flex-direction:column">
-                  <sc-for list="{{ priceMovers }}" as="p" hint-placeholder-count="5">
-                    <button onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:12px;padding:11px 16px;border:none;background:transparent;cursor:pointer;font-family:inherit;text-align:left;border-radius:16px;transition:background .14s" style-hover="background:var(--card2)">
-                      <div style="flex:1;min-width:0">
-                        <div style="font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-                        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">{{ p.meta }}</div>
-                      </div>
-                      <div style="flex:none;width:76px;height:30px">{{ p.spark }}</div>
-                      <div style="flex:none;text-align:right;min-width:66px">
-                        <div style="font-size:13.5px;font-weight:800;color:var(--ink);white-space:nowrap">{{ p.last }}</div>
-                        <div style="font-size:11.5px;font-weight:700; color: {{ p.trendColor }}">{{ p.trend }}</div>
-                      </div>
-                    </button>
-                  </sc-for>
-                </div>
-              </section>
+          <!-- Chat header -->
+          <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--card);border:1px solid var(--hair);border-radius:22px;box-shadow:var(--shadow)">
+            <span style="flex:none;width:52px;height:52px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ chatAvatar }}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:var(--sf);font-weight:700;font-size:17px;color:var(--ink);line-height:1.2;display:flex;align-items:center;gap:8px">Пігулькін<span style="font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);padding:2px 8px;border-radius:999px">AI-помічник</span></div>
+              <div style="font-size:12.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%; background: {{ chatDot }}"></span>{{ chatStatus }}</div>
             </div>
+            <button onClick="{{ onChatReset }}" title="Новий чат" style="flex:none;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);border-radius:999px;padding:8px 15px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:background .14s" style-hover="background:var(--card)">Новий чат</button>
           </div>
 
-          <section>
-            <h2 style="margin:0 0 14px;font-family:var(--sf);font-weight:600;font-size:16px;color:var(--ink)">Швидкі переходи</h2>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
-              <sc-for list="{{ quickLinks }}" as="q" hint-placeholder-count="6">
-                <button onClick="{{ q.onClick }}" style="display:flex;align-items:center;gap:13px;padding:16px 18px;border:1px solid var(--hair);background:var(--card);border-radius:20px;cursor:pointer;font-family:inherit;text-align:left;transition:transform .15s,box-shadow .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgba(14,42,54,.08)">
-                  <span style="flex:none;width:40px;height:40px;border-radius:16px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center">{{ q.icon }}</span>
-                  <div style="min-width:0">
-                    <div style="font-size:14px;font-weight:700;color:var(--ink)">{{ q.label }}</div>
-                    <div style="font-size:12px;color:var(--muted);margin-top:1px">{{ q.sub }}</div>
-                  </div>
-                </button>
+          <!-- Message stream -->
+          <div id="gpChatScroll" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:6px 4px 4px">
+            <sc-for list="{{ chatMessages }}" as="m" hint-placeholder-count="2">
+              <div style="display:flex;gap:10px;align-items:flex-end; flex-direction: {{ m.dir }}">
+                <sc-if value="{{ m.isBot }}" hint-placeholder-val="{{ true }}"><span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ m.avatar }}</span></sc-if>
+                <div style="max-width:78%;padding:12px 15px;font-size:14.5px;line-height:1.52;white-space:pre-wrap;word-break:break-word;border-radius:20px; background: {{ m.bubbleBg }}; color: {{ m.bubbleFg }}; border: {{ m.bubbleBd }}; box-shadow: {{ m.bubbleShadow }}; border-bottom-left-radius: {{ m.blr }}; border-bottom-right-radius: {{ m.brr }}">{{ m.text }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ chatTyping }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:10px;align-items:flex-end">
+                <span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ chatAvatarSm }}</span>
+                <div style="padding:15px 18px;border-radius:20px;border-bottom-left-radius:6px;background:var(--card);border:1px solid var(--hair);box-shadow:var(--shadow)"><span class="gp-typing"><i></i><i></i><i></i></span></div>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- Starter prompts -->
+          <sc-if value="{{ chatShowSuggest }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
+              <sc-for list="{{ chatSuggest }}" as="q" hint-placeholder-count="4">
+                <button onClick="{{ q.onClick }}" style="border:1px solid var(--hair);background:var(--card);color:var(--accent-ink);border-radius:999px;padding:9px 15px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .14s" style-hover="background:var(--accent-soft);transform:translateY(-1px)">{{ q.label }}</button>
               </sc-for>
             </div>
-          </section>
+          </sc-if>
+
+          <!-- Composer -->
+          <div style="display:flex;align-items:flex-end;gap:10px;background:var(--card);border:1px solid var(--hair);border-radius:24px;padding:8px 8px 8px 18px;box-shadow:var(--shadow)">
+            <textarea value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Запитайте Пігулькіна про постачальників, ціни, RFQ…" rows="1" style="flex:1;border:none;background:transparent;outline:none;resize:none;font-family:inherit;font-size:14.5px;color:var(--ink);line-height:1.5;max-height:140px;min-height:26px;padding:9px 0"></textarea>
+            <button onClick="{{ onChatSend }}" title="Надіслати" style="flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .14s,transform .12s;color:#fff; background: {{ chatSendBg }}" style-hover="transform:scale(1.06)">{{ iconSend }}</button>
+          </div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);padding-bottom:2px">Пігулькін бачить вашу базу постачальників, цін і RFQ. Backend у розробці.</div>
         </div>
       </sc-if>
 
@@ -865,6 +854,7 @@ class Component extends DCLogic {
       openPosName: "",
       openPos: 0,
       route: "dashboard",
+      chatMessages: [], chatInput: "", chatTyping: false,
       collapsed: false,
       mascotEnabled: props.showMascot !== false,
       mood: "neutral",
@@ -900,6 +890,7 @@ class Component extends DCLogic {
 
   componentDidMount(){
     try{ const s=JSON.parse(localStorage.getItem("gp_rest_v2")||"{}"); if(s.best||s.stats) this.setState({rzBest:s.best||{},rzStats:s.stats||this.state.rzStats,rzStreak:s.streak||4,vol:s.vol==null?45:s.vol,sfx:s.sfx!==false}); }catch(e){}
+    if(this.state.route==="dashboard") this.seedChat();
     this._key = (e)=>this.rzKey(e);
     window.addEventListener("keydown", this._key);
     this._rzTick = setInterval(()=>{ const S=this.state;
@@ -1245,7 +1236,7 @@ class Component extends DCLogic {
   // ---------- guided tour ----------
   get TOUR(){ return [
     {sel:'[data-tour="sidebar"]', place:"right", pad:6, title:"Головне меню", text:"Уся навігація кабінету зліва. Звідси ти переходиш між усіма розділами — я підсвічу кожен."},
-    {sel:'[data-tour="nav-dashboard"]', place:"right", title:"Дашборд", text:"Зведена картина дня: що потребує уваги, рух цін і швидкі переходи."},
+    {sel:'[data-tour="nav-dashboard"]', place:"right", title:"Чат з Пігулькіним", text:"Головний екран — розмова з AI-помічником Пігулькіним. Питайте про постачальників, ціни та RFQ звичайною мовою."},
     {sel:'[data-tour="nav-suppliers"]', place:"right", title:"Постачальники", text:"База з 1 162 компаній — реальні контакти, історія листування й ціни по кожному товару."},
     {sel:'[data-tour="nav-rfq"]', place:"right", title:"RFQ-розсилки", text:"Створюй запити комерційних пропозицій і порівнюй відповіді постачальників поруч."},
     {sel:'[data-tour="nav-monitoring"]', place:"right", title:"Моніторинг цін", text:"Я автоматично розбираю цінові листи з пошти — тобі лишається підтвердити або відхилити."},
@@ -1272,6 +1263,62 @@ class Component extends DCLogic {
     if(route==="monitoring"){ this.say("loading",msg,{bubble:true}); if(this._t)clearTimeout(this._t); this._t=setTimeout(()=>{ this.say("happy","Готово! Дві ціни потребують твого підтвердження.",{bubble:true}); this.setState({monitorStatus:"Розпізнано 2 нові листи · чекають на підтвердження."}); },1400); }
     else this.say(mood,msg,{bubble:true});
     if(route!=="rest") this.stopSnake();
+    if(route==="dashboard") this.seedChat();
+  }
+
+  // ---------- ПІГУЛЬКІН CHAT ----------
+  // Integration seam for the future backend. Set PIGULKIN_API to your endpoint
+  // (POST {messages:[{role,text}]} -> {reply:"..."}) and pigulkinReply() будет
+  // ходить у справжній бекенд. Поки що — чесний плейсхолдер, без вигаданих даних.
+  get PIGULKIN_API(){ return (typeof window!=="undefined" && window.GP_PIGULKIN_API) || ""; }
+
+  chatGreeting(){
+    const n = this.SITE.companies.length;
+    return "Привіт! Я Пігулькін — ваш AI-помічник по закупівлях.\n"+
+      "У мене під рукою база на "+this.n2(n)+" постачальників з контактами, цінами та історією RFQ. "+
+      "Запитайте, наприклад, хто пропонує потрібну субстанцію, як рухалися ціни або кому надіслати запит.";
+  }
+  chatSuggestions(){
+    return [
+      "Хто постачає диклофенак і за якою ціною?",
+      "Які ціни зросли за останній час?",
+      "Знайди заводи в Індії з активним діалогом",
+      "Кому надіслати RFQ на ібупрофен?"
+    ];
+  }
+  seedChat(){
+    if(!this.state.chatMessages.length)
+      this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}]});
+  }
+  scrollChat(){
+    try{ const el=document.getElementById("gpChatScroll"); if(el) el.scrollTop=el.scrollHeight; }catch(e){}
+  }
+  resetChat(){ this.setState({chatMessages:[{role:"bot",text:this.chatGreeting()}],chatInput:"",chatTyping:false}); }
+  onChatKey(e){ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); this.sendChat(); } }
+  sendChat(){
+    const text=(this.state.chatInput||"").trim();
+    if(!text || this.state.chatTyping) return;
+    const msgs=this.state.chatMessages.concat([{role:"user",text}]);
+    this.setState({chatMessages:msgs, chatInput:"", chatTyping:true}, ()=>this.scrollChat());
+    this.pigulkinReply(msgs).then(reply=>{
+      this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:reply}]), chatTyping:false}, ()=>this.scrollChat());
+    }).catch(()=>{
+      this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:"Не вдалося зв'язатися з сервером Пігулькіна. Спробуйте ще раз трохи згодом."}]), chatTyping:false}, ()=>this.scrollChat());
+    });
+  }
+  // Async reply. Real backend when PIGULKIN_API is set; otherwise чесна відповідь-заглушка.
+  pigulkinReply(messages){
+    const api=this.PIGULKIN_API;
+    if(api){
+      return fetch(api,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({messages:messages.map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}))})})
+        .then(r=>r.json()).then(d=>d.reply||d.text||"…");
+    }
+    return new Promise(res=>setTimeout(()=>res(
+      "Я вас почув. Мій «розум» (мовна модель + доступ до бази) ще під'єднується — "+
+      "команда саме розробляє бекенд. Щойно його ввімкнуть, я відповідатиму по суті: "+
+      "шукатиму постачальників, порівнюватиму ціни й готуватиму RFQ прямо тут."
+    ), 650));
   }
 
   // ---------- REST ZONE ENGINE ----------
@@ -1903,7 +1950,9 @@ class Component extends DCLogic {
       pause:["0 0 320 512","M48 64C21.5 64 0 85.5 0 112L0 400c0 26.5 21.5 48 48 48l32 0c26.5 0 48-21.5 48-48l0-288c0-26.5-21.5-48-48-48L48 64zm192 0c-26.5 0-48 21.5-48 48l0 288c0 26.5 21.5 48 48 48l32 0c26.5 0 48-21.5 48-48l0-288c0-26.5-21.5-48-48-48l-32 0z"],
       moon:["0 0 384 512","M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"],
       sun:["0 0 512 512","M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"],
-      logout:["0 0 512 512","M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96l0-256c0-53 43-96 96-96l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"]
+      logout:["0 0 512 512","M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96l0-256c0-53 43-96 96-96l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"],
+      send:["0 0 512 512","M16.1 260.2c-22.6 12.9-20.5 47.3 3.6 57.3L160 376l0 103.3c0 18.1 14.6 32.7 32.7 32.7c9.7 0 18.9-4.3 25.1-11.8l62-74.3 123.9 51.6c18.9 7.9 40.8-4.5 43.9-24.7l64-416c1.9-12.1-3.4-24.3-13.5-31.2s-23.3-7.5-34-1.4l-448 256zm52.1 25.5L409.7 90.6 190.1 336l-121.9-50.3zM202.7 464L202.7 400.4 235.9 414l-33.2 50z"],
+      chat:["0 0 512 512","M512 240c0 114.9-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6C73.6 471.1 44.7 480 16 480c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4c0 0 0 0 0 0s0 0 0 0s0 0 0 0c.4-.4 .8-.8 1.3-1.3c2.1-2.2 5.1-5.5 8.6-9.7c6.4-7.8 14.5-19.1 21.8-33.1C33.4 383.3 25.8 366.9 20.7 349.5C15.1 330.5 12.1 310.5 12 289.9C11.9 175.1 122.6 32 256 32c141.4 0 256 93.1 256 208zM212.9 176.3c-6.3-6.3-16.4-6.3-22.6 0s-6.3 16.4 0 22.6L233.4 240l-42.9 42.9c-6.3 6.3-6.3 16.4 0 22.6s16.4 6.3 22.6 0l64-64c6.3-6.3 6.3-16.4 0-22.6l-64-64z"]
     };
     const g=FA[name]||FA.grid;
     return h("svg",{viewBox:g[0],fill:c||"currentColor",style:{width:"100%",height:"100%",display:"block"}}, h("path",{d:g[1]}));
@@ -2136,10 +2185,10 @@ class Component extends DCLogic {
   renderVals(){
     const S=this.state, self=this;
     const routes=["dashboard","suppliers","rfq","monitoring","quality","exhibitions","rest"];
-    const navMeta=[["dashboard","Дашборд","grid",null],["suppliers","Постачальники","box",null],["rfq","RFQ-розсилки","mail","2"],["monitoring","Моніторинг цін","chart",S.mails.filter(m=>m.flagged).length||null],["quality","Якість і переговори","shield","1"],["exhibitions","Виставки","star",null],["rest","Зона відпочинку","coffee",null]];
+    const navMeta=[["dashboard","Чат з Пігулькіним","chat",null],["suppliers","Постачальники","box",null],["rfq","RFQ-розсилки","mail","2"],["monitoring","Моніторинг цін","chart",S.mails.filter(m=>m.flagged).length||null],["quality","Якість і переговори","shield","1"],["exhibitions","Виставки","star",null],["rest","Зона відпочинку","coffee",null]];
     const navItems=navMeta.map(([r,l,ic,badge])=>({label:l,icon:this.icon(ic,S.route===r?"#0E2A36":"#7FB4A6"),bg:S.route===r?"var(--accent)":"transparent",fg:S.route===r?"#062018":"#CFE4DE",hover:S.route===r?"background:#33BEA9;color:#052017":"background:rgba(255,255,255,.09);color:#EAF6F2",badge,showBadge:!!badge&&!S.collapsed,showDot:!!badge&&S.collapsed,onClick:()=>this.nav(r),tour:"nav-"+r}));
 
-    const titles={dashboard:["Дашборд","Загальна зведення по всіх розділах кабінету"],suppliers:["Постачальники","База постачальників, цін і документів"],rfq:["RFQ-розсилки","Запити комерційних пропозицій і порівняння"],monitoring:["Моніторинг цін","Автоматичний розбір цін із пошти"],quality:["Якість і переговори","Претензії та переговорна позиція"],exhibitions:["Виставки","Підготовка до профільних виставок"],rest:["Зона відпочинку","Психологічне розвантаження відділу"]};
+    const titles={dashboard:["Чат з Пігулькіним","AI-помічник закупівельника з доступом до вашої бази"],suppliers:["Постачальники","База постачальників, цін і документів"],rfq:["RFQ-розсилки","Запити комерційних пропозицій і порівняння"],monitoring:["Моніторинг цін","Автоматичний розбір цін із пошти"],quality:["Якість і переговори","Претензії та переговорна позиція"],exhibitions:["Виставки","Підготовка до профільних виставок"],rest:["Зона відпочинку","Психологічне розвантаження відділу"]};
 
     const dc=(up,d)=>d==="—"||d==="0%"?"#8AA39D":up?"#C64A72":"#1D9E75";
 
@@ -2211,6 +2260,21 @@ class Component extends DCLogic {
     const attention=[{title:"Aarti Drugs: диклофенак −12%",meta:"$9.70 / кг · вигідна ціна",tag:"Вигода",dot:"#1D9E75",tagBg:"var(--accent-soft)",tagFg:"#0F6E56",onClick:()=>{this.nav("suppliers");setTimeout(()=>{const cc=this.SITE.companies.find(x=>/aarti/i.test(x.name));if(cc)this.openCompany(cc.key);},80);}},{title:"Divi's: RFQ карведилол очікує",meta:"дедлайн — CPHI Milan",tag:"RFQ",dot:"#F2A73B",tagBg:"#FDF0DA",tagFg:"#B06E13",onClick:()=>this.nav("rfq")},{title:"2 цінові листи чекають підтвердження",meta:"диклофенак −12%, ібупрофен +6%",tag:"Пошта",dot:"#F2A73B",tagBg:"#FDF0DA",tagFg:"#B06E13",onClick:()=>this.nav("monitoring")},{title:"Кейс якості: Diclofenac Sodium",meta:"Aarti Drugs · документи прострочені",tag:"Якість",dot:"#C64A72",tagBg:"#FDECEF",tagFg:"#C64A72",onClick:()=>this.nav("quality")},{title:"CPHI Milan 2026: 26 експонентів",meta:"6–8 жовтня · брифи готові",tag:"Виставка",dot:"var(--accent)",tagBg:"var(--accent-soft)",tagFg:"#0F6E56",onClick:()=>this.nav("exhibitions")}];
     const quickLinks=[{label:"Постачальники",sub:"База та ціни",icon:this.icon("box"),onClick:()=>this.nav("suppliers")},{label:"RFQ-розсилки",sub:"Запити КП",icon:this.icon("mail"),onClick:()=>this.nav("rfq")},{label:"Моніторинг",sub:"Ціни з пошти",icon:this.icon("chart"),onClick:()=>this.nav("monitoring")},{label:"Якість",sub:"Переговори",icon:this.icon("shield"),onClick:()=>this.nav("quality")},{label:"Виставки",sub:"CPHI 2026",icon:this.icon("star"),onClick:()=>this.nav("exhibitions")},{label:"Відпочинок",sub:"5 хвилин паузи",icon:this.icon("coffee"),onClick:()=>this.nav("rest")}].map(q=>({...q,icon:h("span",{style:{width:20,height:20,display:"flex",color:"#0F6E56"}},q.icon)}));
 
+    const chatMessages=(S.chatMessages||[]).map((m,i)=>{
+      const bot=m.role!=="user";
+      return {
+        text:m.text, isBot:bot, dir:bot?"row":"row-reverse",
+        avatar:bot?this.buildMascot("happy",28):null,
+        bubbleBg:bot?"var(--card)":"var(--accent-grad)",
+        bubbleFg:bot?"var(--ink)":"#ffffff",
+        bubbleBd:bot?"1px solid var(--hair)":"none",
+        bubbleShadow:bot?"var(--shadow)":"0 6px 16px rgba(52,199,89,.28)",
+        blr:bot?"6px":"20px", brr:bot?"20px":"6px"
+      };
+    });
+    const chatHasText=!!(S.chatInput||"").trim();
+    const chatSuggest=this.chatSuggestions().map(q=>({label:q,onClick:()=>this.setState({chatInput:q})}));
+
     return {
       themeAttr: S.theme || "light",
       onToggleTheme: ()=>this.setState({theme: S.theme==="dark"?"light":"dark"}),
@@ -2249,6 +2313,19 @@ class Component extends DCLogic {
       onGoRest:()=>this.nav("rest"),
       onGoMonitoring:()=>this.nav("monitoring"),
       priceMovers:this.buildPriceMovers(),
+
+      // ---- Пігулькін chat ----
+      chatMessages,
+      chatAvatar:this.buildMascot("happy",44), chatAvatarSm:this.buildMascot("happy",28),
+      chatStatus:S.chatTyping?"друкує…":"Онлайн · готовий допомогти",
+      chatDot:S.chatTyping?"#F2A73B":"var(--accent)",
+      chatTyping:!!S.chatTyping,
+      chatShowSuggest:(S.chatMessages||[]).length<=1 && !S.chatTyping,
+      chatSuggest,
+      chatInput:S.chatInput||"", onChatInput:(e)=>this.setState({chatInput:e.target.value}),
+      onChatKey:(e)=>this.onChatKey(e), onChatSend:()=>this.sendChat(), onChatReset:()=>this.resetChat(),
+      chatSendBg:(chatHasText&&!S.chatTyping)?"var(--accent-grad)":"#B8CCC6",
+      iconSend:h("span",{style:{width:20,height:20,display:"flex"}}, this.icon("send")),
       ...this.rfqVals(),
       notAuthed: !S.user,
       authMascot:this.buildMascot(S.user?"happy":"encouraging",200),

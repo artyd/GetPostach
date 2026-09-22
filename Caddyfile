@@ -1,0 +1,31 @@
+# Pigulkin / GetPostach — Caddy on :8017
+# Serves the static frontend and reverse-proxies /api/* to the FastAPI backend.
+# auto_https is off: this vhost is exposed on the non-standard port 8017, so TLS
+# is expected to be terminated by the server's edge proxy / DNS mapping for
+# getpostach.alliancegroup95.com. (To let Caddy manage TLS itself, switch the
+# site address to the bare domain and publish 80/443 instead — see README.)
+
+{
+	admin off
+	auto_https off
+}
+
+# Matches any Host on :8017 — works for getpostach.alliancegroup95.com and the raw IP.
+:8017 {
+	encode gzip zstd
+
+	# API → backend (path prefix preserved: backend routes live under /api and /health)
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else → static frontend
+	handle {
+		root * /srv/site
+		try_files {path} /index.html
+		file_server
+	}
+}

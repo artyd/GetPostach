@@ -1,0 +1,18 @@
+# Build context is the repo root; the image only needs requirements.txt + backend/.
+.git/
+.venv/
+backend/.venv/
+**/__pycache__/
+*.pyc
+*.db
+*.sqlite3
+.env
+secrets/
+# Frontend static assets — not needed in the backend image
+index.html
+GetPostach visionOS.dc.html
+support.js
+suppliers-data.js
+build-data.js
+data/
+node_modules/

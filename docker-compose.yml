@@ -1,0 +1,104 @@
+# Pigulkin / GetPostach platform — Caddy + backend + Postgres + two MCP servers.
+# Deploy on the client's Linux server:  docker compose up -d --build
+# First run imports the CPHI data automatically (AUTO_IMPORT=1 on the backend).
+# Public entry: Caddy on :8017 (domain getpostach.alliancegroup95.com) —
+# serves the static frontend and proxies /api/* to the backend.
+
+x-app-build: &app-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pigulkin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pigulkin}
+      POSTGRES_DB: pigulkin
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pigulkin -d pigulkin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: *app-build
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://pigulkin:${POSTGRES_PASSWORD:-pigulkin}@db:5432/pigulkin
+      CPHI_DATA_DIR: /cphi/data
+      AUTO_IMPORT: "1"
+    volumes:
+      # Mount the CPHI_MILAN repo's data dir (read-only) for the one-time import.
+      - ${CPHI_REPO_DIR:-../CPHI_MILAN}/data:/cphi/data:ro
+    # No host port — reachable only inside the compose network (via Caddy).
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "8017:8017"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Static frontend assets served at the domain root.
+      - ./index.html:/srv/site/index.html:ro
+      - ./support.js:/srv/site/support.js:ro
+      - ./suppliers-data.js:/srv/site/suppliers-data.js:ro
+      - ./data:/srv/site/data:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+  mcp-procurement:
+    build: *app-build
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://pigulkin:${POSTGRES_PASSWORD:-pigulkin}@db:5432/pigulkin
+      AUTO_IMPORT: "0"
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8931"
+    command: ["python", "-m", "mcp_servers.procurement"]
+    ports:
+      - "8931:8931"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  mcp-email:
+    build: *app-build
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://pigulkin:${POSTGRES_PASSWORD:-pigulkin}@db:5432/pigulkin
+      AUTO_IMPORT: "0"
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8932"
+      GMAIL_CREDENTIALS_PATH: /secrets/gmail_credentials.json
+      GMAIL_TOKEN_PATH: /secrets/gmail_token.json
+    command: ["python", "-m", "mcp_servers.email_drafts"]
+    volumes:
+      # Put gmail_credentials.json + gmail_token.json here after authorizing.
+      - ./secrets:/secrets
+    ports:
+      - "8932:8932"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata: {}
+  caddy_data: {}
+  caddy_config: {}

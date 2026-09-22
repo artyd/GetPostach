@@ -1,7 +1,9 @@
 # GetPostach — кабінет закупівельника (visionOS)
 
-Статичний фронтенд особистого кабінету закупівельника Alliance Group 95: дашборд,
-постачальники, RFQ-розсилки, моніторинг цін, якість і переговори, помічник «Пігулькін».
+Статичний фронтенд особистого кабінету закупівельника Alliance Group 95: чат з
+AI-помічником «Пігулькін», постачальники, RFQ-розсилки, моніторинг цін, якість і
+переговори. Головний екран — діалог із Пігулькіним (backend у розробці; точка
+під'єднання — `window.GP_PIGULKIN_API`).
 
 **Live:** https://artyd.github.io/GetPostach/
 
@@ -40,3 +42,13 @@ git add -A && git commit -m "refresh data" && git push
 ```
 
 > Скрипт очікує репозиторій `CPHI_MILAN` поруч: `C:/Projects/Артем/CPHI_MILAN`.
+
+## Бекенд (`backend/`)
+
+Повноцінний бекенд Пігулькіна живе в цьому ж репозиторії, у папці `backend/`:
+FastAPI + PostgreSQL + Claude API (tool-calling по базі постачальників) та два
+MCP-сервери (закупівлі + чернетки Gmail). Деплой — Docker (`docker-compose.yml` у корені).
+
+- Документація й інструкції: [`backend/README.md`](backend/README.md).
+- Чат на фронтенді ходить на бекенд через `window.GP_PIGULKIN_API` (див. `backend/README.md` → «Wiring the frontend»).
+- Статичний сайт (корінь репо) деплоїться на GitHub Pages; бекенд — окремо на ваш сервер.
