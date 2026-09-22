@@ -250,7 +250,10 @@
               <sc-for list="{{ chatMessages }}" as="m" hint-placeholder-count="2">
                 <div style="display:flex;gap:10px;align-items:flex-end; flex-direction: {{ m.dir }}">
                   <sc-if value="{{ m.isBot }}" hint-placeholder-val="{{ true }}"><span style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden">{{ m.avatar }}</span></sc-if>
-                  <div class="{{ m.cls }}" style="max-width:82%;padding:12px 15px;font-size:14.5px;line-height:1.52;white-space: {{ m.ws }};word-break:break-word;border-radius:20px; background: {{ m.bubbleBg }}; color: {{ m.bubbleFg }}; border: {{ m.bubbleBd }}; box-shadow: {{ m.bubbleShadow }}; border-bottom-left-radius: {{ m.blr }}; border-bottom-right-radius: {{ m.brr }}">{{ m.body }}</div>
+                  <div style="max-width:82%;display:flex;flex-direction:column;gap:5px; align-items: {{ m.colAlign }}">
+                    <div class="{{ m.cls }}" data-msgidx="{{ m.idx }}" style="max-width:100%;padding:12px 15px;font-size:14.5px;line-height:1.52;white-space: {{ m.ws }};word-break:break-word;border-radius:20px; background: {{ m.bubbleBg }}; color: {{ m.bubbleFg }}; border: {{ m.bubbleBd }}; box-shadow: {{ m.bubbleShadow }}; border-bottom-left-radius: {{ m.blr }}; border-bottom-right-radius: {{ m.brr }}">{{ m.body }}</div>
+                    <sc-if value="{{ m.isBot }}" hint-placeholder-val="{{ false }}"><button onClick="{{ m.onExport }}" title="Експортувати у PDF / друк" style="border:1px solid var(--hair);background:var(--card);color:var(--muted);border-radius:8px;padding:4px 10px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:var(--accent-ink);border-color:var(--accent)"><span style="width:12px;height:12px;display:flex">{{ iconDoc }}</span>Експорт у PDF</button></sc-if>
+                  </div>
                 </div>
               </sc-for>
               <sc-if value="{{ chatTyping }}" hint-placeholder-val="{{ false }}">
@@ -1485,6 +1488,42 @@ class Component extends DCLogic {
     try{ const el=document.getElementById("gpChatScroll"); if(el) el.scrollTop=el.scrollHeight; }catch(e){}
   }
   autoGrowInput(el){ el=el||document.getElementById("gpChatInput"); if(!el)return; try{ el.style.height="auto"; el.style.height=Math.min(140,Math.max(26,el.scrollHeight))+"px"; }catch(e){} }
+
+  // Print / export a Пігулькін answer (e.g. a meeting brief) to PDF via the browser print dialog.
+  printCSS(){
+    return [
+      ":root{--sf:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;",
+      "--ink:#0b1a20;--ink2:#41525b;--muted:#7b8a91;",
+      "--card:#ffffff;--card2:#f2f6f5;--card-solid:#ffffff;--bgbase:#eef2f4;",
+      "--hair:rgba(18,40,50,.18);",
+      "--accent:#34C759;--accent-ink:#1f9e46;--accent-soft:rgba(52,199,89,.15);--accent-grad:linear-gradient(150deg,#34C759,#0f8a5f);}",
+      "*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}",
+      "body{font-family:var(--sf);color:var(--ink);margin:0;padding:26px 30px;background:#fff;font-size:13.5px;line-height:1.55;}",
+      ".gp-print-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent);padding-bottom:10px;margin-bottom:18px;}",
+      ".gp-print-brand{font-weight:800;color:var(--accent-ink);font-size:14px;}",
+      ".gp-print-date{color:var(--muted);font-size:12px;}",
+      ".gp-print-body table{border-collapse:collapse;width:100%;}",
+      ".gp-print-body svg{max-width:100%;height:auto;}",
+      ".gp-print-body img{max-width:100%;height:auto;}",
+      "table,tr,td,th,svg,img,pre{page-break-inside:avoid;}",
+      "a{color:var(--accent-ink);}",
+      "@page{margin:14mm;}"
+    ].join("");
+  }
+  exportMsgPdf(idx){
+    let el=null; try{ el=document.querySelector('[data-msgidx="'+idx+'"]'); }catch(e){}
+    if(!el){ return; }
+    const inner=el.innerHTML;
+    let dateStr=""; try{ dateStr=new Date().toLocaleDateString("uk-UA"); }catch(e){}
+    const head="<div class='gp-print-head'><div class='gp-print-brand'>Alliance Group 95 · Відділ закупівель · Пігулькін</div><div class='gp-print-date'>"+dateStr+"</div></div>";
+    const doc="<!doctype html><html lang='uk'><head><meta charset='utf-8'><title>Бриф до зустрічі — Alliance Group 95</title><style>"+this.printCSS()+"</style></head><body>"
+      +head+"<div class='gp-print-body'>"+inner+"</div>"
+      +"<scr"+"ipt>window.onload=function(){setTimeout(function(){window.focus();window.print();},350);};</scr"+"ipt>"
+      +"</body></html>";
+    let w=null; try{ w=window.open("","_blank"); }catch(e){}
+    if(!w){ this.say&&this.say("puzzled","Дозвольте спливні вікна, щоб зберегти PDF.",{toast:true}); return; }
+    try{ w.document.open(); w.document.write(doc); w.document.close(); }catch(e){}
+  }
   // Pull the selected fragment into the composer as a quoted question seed.
   askAboutSelection(e){
     if(e&&e.preventDefault) e.preventDefault();
@@ -2712,7 +2751,8 @@ class Component extends DCLogic {
     const chatMessages=(S.chatMessages||[]).map((m,i)=>{
       const bot=m.role!=="user";
       return {
-        text:m.text, isBot:bot, dir:bot?"row":"row-reverse", cls:bot?"gp-bot-bubble":"gp-user-bubble",
+        text:m.text, isBot:bot, idx:i, dir:bot?"row":"row-reverse", cls:bot?"gp-bot-bubble":"gp-user-bubble",
+        colAlign:bot?"flex-start":"flex-end", onExport:()=>this.exportMsgPdf(i),
         body: bot? this.buildMarkdown(m.text) : m.text,
         ws: bot? "normal" : "pre-wrap",
         avatar:bot?this.buildMascot("happy",28):null,
