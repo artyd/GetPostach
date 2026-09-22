@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..auth import rate_limit, require_user
 from ..config import get_settings
 from ..db import SessionLocal, get_db
 from ..services import chat as chat_service
@@ -59,7 +60,8 @@ def chat_health():
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, db: Session = Depends(get_db)):
+def chat(req: ChatRequest, db: Session = Depends(get_db), user: str = Depends(require_user)):
+    rate_limit(user)
     if not settings.chat_enabled:
         return ChatResponse(reply=_NO_KEY)
     atts = [a.model_dump() for a in req.attachments] if req.attachments else None
@@ -71,7 +73,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/chat/stream")
-def chat_stream(req: ChatRequest):
+def chat_stream(req: ChatRequest, user: str = Depends(require_user)):
+    rate_limit(user)
     msgs = [m.model_dump() for m in req.messages]
     summary = req.summary
     atts = [a.model_dump() for a in req.attachments] if req.attachments else None
@@ -93,7 +96,7 @@ def chat_stream(req: ChatRequest):
 
 
 @router.post("/chat/compact", response_model=CompactResponse)
-def chat_compact(req: ChatRequest, db: Session = Depends(get_db)):
+def chat_compact(req: ChatRequest, db: Session = Depends(get_db), user: str = Depends(require_user)):
     if not settings.chat_enabled:
         return CompactResponse(summary="")
     try:

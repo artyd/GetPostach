@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8765,https://artyd.github.io"
     app_env: str = "dev"
 
+    # --- auth (protects the paid /api/chat + /api/batch endpoints) ---
+    auth_secret: str = ""          # HMAC signing secret; when set, auth is enforced
+    signup_code: str = ""          # required invite code for /api/auth/register (empty = open)
+    chat_rate_limit: int = 40      # max chat requests per user per minute
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -32,6 +37,10 @@ class Settings(BaseSettings):
     @property
     def chat_enabled(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.auth_secret)
 
 
 @lru_cache

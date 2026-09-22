@@ -108,6 +108,9 @@
           <sc-if value="{{ authIsRegister }}" hint-placeholder-val="{{ false }}">
             <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Ім'я та прізвище<input value="{{ authName }}" onInput="{{ onAuthName }}" placeholder="Олег Дребенюк" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
             <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Компанія / відділ<input value="{{ authCompany }}" onInput="{{ onAuthCompany }}" placeholder="Alliance Group 95" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
+            <sc-if value="{{ authCodeRequired }}" hint-placeholder-val="{{ false }}">
+              <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Код запрошення<input value="{{ authCode }}" onInput="{{ onAuthCode }}" placeholder="Отримайте у адміністратора" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
+            </sc-if>
           </sc-if>
           <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Email<input value="{{ authEmail }}" onInput="{{ onAuthEmail }}" type="email" placeholder="you@agroup95.com" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
           <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Пароль<input value="{{ authPass }}" onInput="{{ onAuthPass }}" type="password" placeholder="••••••••" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
@@ -999,7 +1002,7 @@ class Component extends DCLogic {
       rfVol:"", rfPrice:"", rfInco:"FOB", rfSpec:"", rfLead:"", rfCoa:true,
       rfSubject:"", rfSig:"Procurement Team\nAlliance Group 95", rfBodyEdit:{},
       rfqTab:"new",
-      user:this.loadUser(), authMode:"login", authName:"", authEmail:"", authCompany:"", authPass:"", authErr:"",
+      user:this.loadUser(), authMode:"login", authName:"", authEmail:"", authCompany:"", authPass:"", authCode:"", authErr:"", authBusy:false, authCodeRequired:false,
       exFilter: "Усі", exQ:"",
       mails: this.MAILS.map(m=>({...m})),
       rzCur:null, rzCat:"all", rzLevel:1, rzScore:0, rzMascot:"",
@@ -1019,6 +1022,7 @@ class Component extends DCLogic {
   componentDidMount(){
     try{ const s=JSON.parse(localStorage.getItem("gp_rest_v2")||"{}"); if(s.best||s.stats) this.setState({rzBest:s.best||{},rzStats:s.stats||this.state.rzStats,rzStreak:s.streak||4,vol:s.vol==null?45:s.vol,sfx:s.sfx!==false}); }catch(e){}
     this.setState({chats:this.loadChats()});
+    this.loadAuthConfig();
     this._compactTimer = setInterval(()=>{ this.maybeCompact(true); }, 30*60*1000);
     // File attachments: clipboard paste + drag&drop anywhere on the chat screen.
     this._onPaste=(e)=>{ if(this.state.route!=="dashboard") return; const cd=e.clipboardData; if(cd&&cd.files&&cd.files.length){ this.addFiles(cd.files); } };
@@ -1174,32 +1178,58 @@ class Component extends DCLogic {
   usersMap(){ try{ var m=localStorage.getItem("gp_users"); return m?JSON.parse(m):{}; }catch(e){ return {}; } }
   saveUsers(m){ try{ localStorage.setItem("gp_users",JSON.stringify(m)); }catch(e){} }
   initials(name){ var p=(name||"").trim().split(/\s+/); if(!p[0]) return "??"; return ((p[0][0]||"")+(p[1]?p[1][0]:"")).toUpperCase(); }
+  // ---- server auth helpers ----
+  apiRoot(){ return (this.PIGULKIN_API||"/api/chat").replace(/\/chat$/,""); }
+  authToken(){ try{ return localStorage.getItem("gp_token")||""; }catch(e){ return ""; } }
+  authHeaders(){ var h={"Content-Type":"application/json"}; var t=this.authToken(); if(t) h["Authorization"]="Bearer "+t; return h; }
+  applyAuth(d){
+    var user={name:d.name||"",email:d.email||"",company:d.company||""};
+    try{ localStorage.setItem("gp_token",d.token||""); localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
+    this.setState({user:user,authErr:"",authPass:"",authBusy:false});
+    this.say("celebrate","Вітаю, "+(user.name||"колего").split(" ")[0]+"!",{bubble:true});
+  }
+  handleAuthExpired(){ try{ localStorage.removeItem("gp_token"); localStorage.removeItem("gp_user"); }catch(e){} this.setState({user:null,authMode:"login",authPass:"",authErr:"Сесія завершилась — увійдіть знову.",chatTyping:false}); }
+  // Fetch auth mode once so the register form can show/hide the invite-code field.
+  loadAuthConfig(){
+    try{ fetch(this.apiRoot()+"/auth/config").then(r=>r.json()).then(d=>{ if(d&&d.signup_code_required) this.setState({authCodeRequired:true}); }).catch(()=>{}); }catch(e){}
+  }
   doRegister(){
-    var S=this.state, name=(S.authName||"").trim(), email=(S.authEmail||"").trim().toLowerCase(), pass=S.authPass||"";
+    var self=this, S=this.state, name=(S.authName||"").trim(), email=(S.authEmail||"").trim().toLowerCase(), pass=S.authPass||"";
     if(!name||!email||!pass){ this.setState({authErr:"Заповніть ім'я, email і пароль."}); return; }
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ this.setState({authErr:"Некоректний email."}); return; }
-    var m=this.usersMap();
-    if(m[email]){ this.setState({authErr:"Такий email уже зареєстровано — увійдіть."}); return; }
-    m[email]={name:name,company:(S.authCompany||"").trim(),pass:pass};
-    this.saveUsers(m);
-    var user={name:name,email:email,company:(S.authCompany||"").trim()};
-    try{ localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
-    this.setState({user:user,authErr:"",authPass:""});
-    this.say("celebrate","Вітаю на борту, "+name.split(" ")[0]+"! Робоче місце готове.",{bubble:true});
+    this.setState({authBusy:true,authErr:""});
+    fetch(this.apiRoot()+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:pass,name:name,company:(S.authCompany||"").trim(),code:(S.authCode||"").trim()})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(o){ if(!o.ok){ self.setState({authErr:(o.d&&o.d.detail)||"Помилка реєстрації",authBusy:false}); return; } self.applyAuth(o.d); })
+      .catch(function(){ self._localRegister(); });   // no backend -> offline fallback (demo)
   }
   doLogin(){
-    var S=this.state, email=(S.authEmail||"").trim().toLowerCase(), pass=S.authPass||"";
+    var self=this, S=this.state, email=(S.authEmail||"").trim().toLowerCase(), pass=S.authPass||"";
     if(!email||!pass){ this.setState({authErr:"Введіть email і пароль."}); return; }
-    var m=this.usersMap(), rec=m[email];
-    if(!rec||rec.pass!==pass){ this.setState({authErr:"Невірний email або пароль."}); return; }
+    this.setState({authBusy:true,authErr:""});
+    fetch(this.apiRoot()+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:pass})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(o){ if(!o.ok){ self.setState({authErr:(o.d&&o.d.detail)||"Невірний email або пароль.",authBusy:false}); return; } self.applyAuth(o.d); })
+      .catch(function(){ self._localLogin(); });        // no backend -> offline fallback (demo)
+  }
+  doLogout(){ try{ localStorage.removeItem("gp_user"); localStorage.removeItem("gp_token"); }catch(e){} this.setState({user:null,authMode:"login",authPass:"",authErr:""}); }
+
+  // Offline fallback (static demo without a backend) — local-only accounts.
+  _localRegister(){
+    var S=this.state, name=(S.authName||"").trim(), email=(S.authEmail||"").trim().toLowerCase();
+    var m=this.usersMap(); if(m[email]){ this.setState({authErr:"Такий email уже зареєстровано — увійдіть.",authBusy:false}); return; }
+    m[email]={name:name,company:(S.authCompany||"").trim(),pass:S.authPass||""}; this.saveUsers(m);
+    var user={name:name,email:email,company:(S.authCompany||"").trim()};
+    try{ localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
+    this.setState({user:user,authErr:"",authPass:"",authBusy:false});
+  }
+  _localLogin(){
+    var S=this.state, email=(S.authEmail||"").trim().toLowerCase(), m=this.usersMap(), rec=m[email];
+    if(!rec||rec.pass!==(S.authPass||"")){ this.setState({authErr:"Невірний email або пароль.",authBusy:false}); return; }
     var user={name:rec.name,email:email,company:rec.company||""};
     try{ localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
-    this.setState({user:user,authErr:"",authPass:""});
-    this.say("happy","З поверненням, "+rec.name.split(" ")[0]+"!",{bubble:true});
+    this.setState({user:user,authErr:"",authPass:"",authBusy:false});
   }
-  doLogout(){ try{ localStorage.removeItem("gp_user"); }catch(e){} this.setState({user:null,authMode:"login",authPass:"",authErr:""}); }
-
-  loadUser_end(){}
   // ---------- RFQ mailing builder ----------
   primaryContact(c){ var ppl=c.people||[]; if(!ppl.length) return null; var pr=ppl.filter(function(p){return p.primary;}); return pr[0]||ppl[0]; }
   gaveProduct(c,prod){ return (c.prices||[]).some(function(g){return g.product===prod;}); }
@@ -1563,7 +1593,9 @@ class Component extends DCLogic {
       if(!started){ started=true; cm=cm.concat([{role:"bot",text:t,streaming:true}]); this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>this.scrollChat()); }
       else { const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{text:(last.text||"")+t}); this.setState({chatMessages:cm},()=>this.scrollChat()); } }
     };
-    fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body}).then((resp)=>{
+    fetch(url,{method:"POST",headers:this.authHeaders(),body:body}).then((resp)=>{
+      if(resp.status===401){ this.handleAuthExpired(); throw new Error("unauthorized"); }
+      if(resp.status===429){ this.setState({chatMessages:this.state.chatMessages.concat([{role:"bot",text:"⚠ Забагато запитів поспіль. Зачекайте хвилинку й спробуйте ще раз."}]), chatTyping:false, chatStatus2:""},()=>this.scrollChat()); throw new Error("rate limited"); }
       if(!resp.ok || !resp.body){ throw new Error("stream http "+resp.status); }
       const reader=resp.body.getReader(); const dec=new TextDecoder(); let buf="";
       const finish=()=>{ let cm=this.state.chatMessages.slice(); const last=cm[cm.length-1]; if(last&&last.streaming){ cm[cm.length-1]=Object.assign({},last,{streaming:false}); } this.setState({chatMessages:cm, chatTyping:false, chatStatus2:""},()=>{ this.scrollChat(); this.saveCurrentChat(); this.maybeCompact(false); }); };
@@ -1598,7 +1630,7 @@ class Component extends DCLogic {
     const keep=msgs.slice(msgs.length-KEEP);
     if(toCompact.length<2) return;
     this.setState({chatCompacting:true});
-    fetch(api+"/compact",{method:"POST",headers:{"Content-Type":"application/json"},
+    fetch(api+"/compact",{method:"POST",headers:this.authHeaders(),
       body:JSON.stringify({messages:toCompact.map(function(m){return {role:m.role,text:m.text};}), summary:S.chatSummary||""})})
       .then(function(r){return r.json();}).then((d)=>{
         const note={role:"bot",text:"🗜 Попередню частину розмови згорнуто, щоб не перевантажувати контекст і не витрачати зайві токени.",compacted:true};
@@ -2856,10 +2888,12 @@ class Component extends DCLogic {
       authCompany:S.authCompany, onAuthCompany:(e)=>this.setState({authCompany:e.target.value}),
       authEmail:S.authEmail, onAuthEmail:(e)=>this.setState({authEmail:e.target.value}),
       authPass:S.authPass, onAuthPass:(e)=>this.setState({authPass:e.target.value}),
+      authCode:S.authCode||"", onAuthCode:(e)=>this.setState({authCode:e.target.value}),
+      authCodeRequired:!!S.authCodeRequired && S.authMode==="register",
       authErr:S.authErr,
-      authCTA:S.authMode==="register"?"Створити акаунт":"Увійти",
-      authHint:S.authMode==="register"?"Дані зберігаються локально у вашому браузері.":"Ще немає акаунта? Оберіть «Реєстрація».",
-      onAuthSubmit:()=>{ S.authMode==="register"?this.doRegister():this.doLogin(); },
+      authCTA:S.authBusy?"Зачекайте…":(S.authMode==="register"?"Створити акаунт":"Увійти"),
+      authHint:S.authMode==="register"?"Акаунт захищений на сервері. Для реєстрації може знадобитись код запрошення.":"Ще немає акаунта? Оберіть «Реєстрація».",
+      onAuthSubmit:()=>{ if(this.state.authBusy) return; this.state.authMode==="register"?this.doRegister():this.doLogin(); },
       userName:S.user?S.user.name:"", userCompany:S.user?(S.user.company||S.user.email):"", userInitials:this.initials(S.user?S.user.name:""),
       onLogout:()=>this.doLogout(), iconLogout:this.icon("logout"),
 

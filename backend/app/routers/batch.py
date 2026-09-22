@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..auth import require_user
 from ..config import get_settings
 from ..db import get_db
 from ..services import batch as batch_service
@@ -22,7 +23,7 @@ class RfqBatchRequest(BaseModel):
 
 
 @router.post("/rfq")
-def create_rfq(req: RfqBatchRequest, db: Session = Depends(get_db)):
+def create_rfq(req: RfqBatchRequest, db: Session = Depends(get_db), user: str = Depends(require_user)):
     if not settings.chat_enabled:
         return {"error": "chat_disabled", "detail": "ANTHROPIC_API_KEY not set"}
     try:
@@ -33,14 +34,14 @@ def create_rfq(req: RfqBatchRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/{batch_id}")
-def batch_status(batch_id: str, db: Session = Depends(get_db)):
+def batch_status(batch_id: str, db: Session = Depends(get_db), user: str = Depends(require_user)):
     if not settings.chat_enabled:
         return {"error": "chat_disabled"}
     return batch_service.get_batch(db, batch_id)
 
 
 @router.post("/{batch_id}/create-drafts")
-def batch_create_drafts(batch_id: str, db: Session = Depends(get_db)):
+def batch_create_drafts(batch_id: str, db: Session = Depends(get_db), user: str = Depends(require_user)):
     if not settings.chat_enabled:
         return {"error": "chat_disabled"}
     return batch_service.create_drafts_from_batch(db, batch_id)
