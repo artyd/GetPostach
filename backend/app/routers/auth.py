@@ -35,6 +35,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PinRequest(BaseModel):
+    pin: str
+
+
 class AuthResponse(BaseModel):
     token: str
     name: str
@@ -75,6 +79,25 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(u)
     return _user_public(u, auth_lib.create_token(email))
+
+
+@router.post("/pin", response_model=AuthResponse)
+def pin_login(req: PinRequest):
+    """Safe-style login: a shared 4-digit PIN unlocks a common team account.
+
+    No registration, no per-user records — just the PIN. Still issues a real
+    signed token so the paid /api/chat + /api/batch endpoints stay protected.
+    """
+    pin = (req.pin or "").strip()
+    if not settings.access_pin or pin != settings.access_pin:
+        raise HTTPException(status_code=401, detail="Невірний код доступу.")
+    email = "team@agroup95.com"
+    return AuthResponse(
+        token=auth_lib.create_token(email),
+        name="AGROUP",
+        email=email,
+        company="Alliance Group 95",
+    )
 
 
 @router.post("/login", response_model=AuthResponse)

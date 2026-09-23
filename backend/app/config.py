@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # --- auth (protects the paid /api/chat + /api/batch endpoints) ---
     auth_secret: str = ""          # HMAC signing secret; when set, auth is enforced
     signup_code: str = ""          # required invite code for /api/auth/register (empty = open)
+    access_pin: str = "1995"       # shared 4-digit access PIN for /api/auth/pin (safe-style login)
     chat_rate_limit: int = 40      # max chat requests per user per minute
 
     @property

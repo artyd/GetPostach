@@ -96,27 +96,36 @@
               <div style="line-height:1.05"><div style="font-family:var(--sf);font-weight:700;font-size:19px;letter-spacing:-.5px">GetPostach</div><div style="font-size:10.5px;letter-spacing:2px;color:#BFEBDC;font-weight:600;text-transform:uppercase">AGROUP · Закупівлі</div></div>
             </div>
             <h2 style="font-family:var(--sf);font-weight:700;font-size:26px;letter-spacing:-.6px;margin:28px 0 8px">Особистий кабінет закупівельника</h2>
-            <p style="font-size:14px;line-height:1.55;color:#DBF3EA;margin:0;max-width:340px">Ваше робоче місце: постачальники, ціни, RFQ-розсилки й Пігулькін-помічник. Увійдіть або створіть акаунт.</p>
+            <p style="font-size:14px;line-height:1.55;color:#DBF3EA;margin:0;max-width:340px">Ваше робоче місце: постачальники, ціни, RFQ-розсилки й Пігулькін-помічник. Введіть код доступу, щоб увійти.</p>
           </div>
           <div style="display:flex;align-items:flex-end;justify-content:center;flex:1;padding:18px 0 4px"><div style="position:relative;display:flex;align-items:center;justify-content:center;width:250px;height:250px"><div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.9),rgba(255,255,255,.5) 58%,transparent 72%);box-shadow:0 20px 50px rgba(6,50,32,.35)"></div><div style="position:relative">{{ authMascot }}</div></div></div>
         </div>
-        <div style="padding:38px 34px;display:flex;flex-direction:column;gap:14px">
-          <div style="display:flex;background:var(--card2);border-radius:14px;padding:4px;gap:4px">
-            <button onClick="{{ onAuthLoginTab }}" style="flex:1;border:none;border-radius:11px;padding:10px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer; background: {{ authLoginBg }}; color: {{ authLoginFg }}">Вхід</button>
-            <button onClick="{{ onAuthRegTab }}" style="flex:1;border:none;border-radius:11px;padding:10px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer; background: {{ authRegBg }}; color: {{ authRegFg }}">Реєстрація</button>
+        <div style="padding:38px 34px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px">
+          <div style="text-align:center">
+            <div style="font-family:var(--sf);font-weight:700;font-size:22px;letter-spacing:-.5px;color:var(--ink)">Код доступу</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:6px">Введіть 4-значний пін — як від сейфа</div>
           </div>
-          <sc-if value="{{ authIsRegister }}" hint-placeholder-val="{{ false }}">
-            <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Ім'я та прізвище<input value="{{ authName }}" onInput="{{ onAuthName }}" placeholder="Олег Дребенюк" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
-            <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Компанія / відділ<input value="{{ authCompany }}" onInput="{{ onAuthCompany }}" placeholder="Alliance Group 95" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
-            <sc-if value="{{ authCodeRequired }}" hint-placeholder-val="{{ false }}">
-              <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Код запрошення<input value="{{ authCode }}" onInput="{{ onAuthCode }}" placeholder="Отримайте у адміністратора" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
-            </sc-if>
-          </sc-if>
-          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Email<input value="{{ authEmail }}" onInput="{{ onAuthEmail }}" type="email" placeholder="you@agroup95.com" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
-          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)">Пароль<input value="{{ authPass }}" onInput="{{ onAuthPass }}" type="password" placeholder="••••••••" style="border:1px solid var(--hair);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);outline:none"/></label>
-          <sc-if value="{{ authErr }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#C64A72;font-weight:600">{{ authErr }}</div></sc-if>
-          <button onClick="{{ onAuthSubmit }}" style="margin-top:4px;border:none;border-radius:13px;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;cursor:pointer">{{ authCTA }}</button>
-          <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">{{ authHint }}</div>
+          <div style="display:flex;gap:16px">
+            <div style="width:15px;height:15px;border-radius:50%;border:2px solid var(--hair);background: {{ pinDot0Bg }};transition:background .15s"></div>
+            <div style="width:15px;height:15px;border-radius:50%;border:2px solid var(--hair);background: {{ pinDot1Bg }};transition:background .15s"></div>
+            <div style="width:15px;height:15px;border-radius:50%;border:2px solid var(--hair);background: {{ pinDot2Bg }};transition:background .15s"></div>
+            <div style="width:15px;height:15px;border-radius:50%;border:2px solid var(--hair);background: {{ pinDot3Bg }};transition:background .15s"></div>
+          </div>
+          <div style="min-height:16px;font-size:12.5px;color:#C64A72;font-weight:600">{{ authErr }}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,72px);gap:14px">
+            <button onClick="{{ onPin1 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">1</button>
+            <button onClick="{{ onPin2 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">2</button>
+            <button onClick="{{ onPin3 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">3</button>
+            <button onClick="{{ onPin4 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">4</button>
+            <button onClick="{{ onPin5 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">5</button>
+            <button onClick="{{ onPin6 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">6</button>
+            <button onClick="{{ onPin7 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">7</button>
+            <button onClick="{{ onPin8 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">8</button>
+            <button onClick="{{ onPin9 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">9</button>
+            <button onClick="{{ onPinClear }}" style="width:72px;height:72px;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--muted);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">Скинути</button>
+            <button onClick="{{ onPin0 }}" style="width:72px;height:72px;border-radius:50%;border:1px solid var(--hair);background:var(--card);color:var(--ink);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">0</button>
+            <button onClick="{{ onPinBack }}" style="width:72px;height:72px;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--muted);font-family:inherit;font-size:26px;font-weight:600;cursor:pointer">⌫</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1014,7 +1023,7 @@ class Component extends DCLogic {
       rfVol:"", rfPrice:"", rfInco:"FOB", rfSpec:"", rfLead:"", rfCoa:true,
       rfSubject:"", rfSig:"Procurement Team\nAlliance Group 95", rfBodyEdit:{},
       rfqTab:"new",
-      user:this.loadUser(), authMode:"login", authName:"", authEmail:"", authCompany:"", authPass:"", authCode:"", authErr:"", authBusy:false, authCodeRequired:false,
+      user:this.loadUser(), pin:"", authErr:"", authBusy:false,
       exFilter: "Усі", exQ:"",
       mails: this.MAILS.map(m=>({...m})),
       rzCur:null, rzCat:"all", rzLevel:1, rzScore:0, rzMascot:"",
@@ -1045,6 +1054,9 @@ class Component extends DCLogic {
     document.addEventListener("dragover", this._onDragOver);
     document.addEventListener("drop", this._onDrop);
     document.addEventListener("dragleave", this._onDragLeaveWin);
+    // PIN screen: allow typing the code on a physical keyboard too.
+    this._onPinKey=(e)=>{ if(this.state.user) return; if(e.key>="0"&&e.key<="9"){ this.pinPush(e.key); } else if(e.key==="Backspace"){ e.preventDefault(); this.pinPop(); } };
+    document.addEventListener("keydown", this._onPinKey);
     // Select a fragment inside a bot answer -> floating "ask about it" button.
     this._onSelectText=(e)=>{
       try{
@@ -1074,7 +1086,7 @@ class Component extends DCLogic {
     },1000);
   }
   componentDidUpdate(){ if(this.state.route==="dashboard"){ try{ this._renderMermaid(); }catch(e){} } }
-  componentWillUnmount(){ window.removeEventListener("keydown", this._key); if(this._tourResize){window.removeEventListener("resize",this._tourResize);this._tourResize=null;} this.rzStopLoop(); this.rzStopAudio(); if(this._rzTick)clearInterval(this._rzTick); if(this._compactTimer)clearInterval(this._compactTimer); if(this._t)clearTimeout(this._t); if(this._onPaste){document.removeEventListener("paste",this._onPaste);document.removeEventListener("dragover",this._onDragOver);document.removeEventListener("drop",this._onDrop);document.removeEventListener("dragleave",this._onDragLeaveWin);} if(this._onSelectText){document.removeEventListener("mouseup",this._onSelectText);} }
+  componentWillUnmount(){ window.removeEventListener("keydown", this._key); if(this._tourResize){window.removeEventListener("resize",this._tourResize);this._tourResize=null;} this.rzStopLoop(); this.rzStopAudio(); if(this._rzTick)clearInterval(this._rzTick); if(this._compactTimer)clearInterval(this._compactTimer); if(this._t)clearTimeout(this._t); if(this._onPaste){document.removeEventListener("paste",this._onPaste);document.removeEventListener("dragover",this._onDragOver);document.removeEventListener("drop",this._onDrop);document.removeEventListener("dragleave",this._onDragLeaveWin);} if(this._onSelectText){document.removeEventListener("mouseup",this._onSelectText);} if(this._onPinKey){document.removeEventListener("keydown",this._onPinKey);} }
 
   // ---------- data ----------
   get SUPPLIERS(){ return (typeof window!=="undefined"&&window.GP_SUPPLIERS)||[]; }
@@ -1197,10 +1209,33 @@ class Component extends DCLogic {
   applyAuth(d){
     var user={name:d.name||"",email:d.email||"",company:d.company||""};
     try{ localStorage.setItem("gp_token",d.token||""); localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
-    this.setState({user:user,authErr:"",authPass:"",authBusy:false});
+    this.setState({user:user,authErr:"",pin:"",authBusy:false});
     this.say("celebrate","Вітаю, "+(user.name||"колего").split(" ")[0]+"!",{bubble:true});
   }
-  handleAuthExpired(){ try{ localStorage.removeItem("gp_token"); localStorage.removeItem("gp_user"); }catch(e){} this.setState({user:null,authMode:"login",authPass:"",authErr:"Сесія завершилась — увійдіть знову.",chatTyping:false}); }
+  handleAuthExpired(){ try{ localStorage.removeItem("gp_token"); localStorage.removeItem("gp_user"); }catch(e){} this.setState({user:null,pin:"",authBusy:false,authErr:"Сесія завершилась — введіть код знову.",chatTyping:false}); }
+  // ---- PIN access (safe-style login) ----
+  pinPush(d){
+    if(this.state.authBusy) return;
+    var p=(this.state.pin||"")+d; if(p.length>4) return;
+    this.setState({pin:p,authErr:""});
+    if(p.length===4) this.doPinLogin(p);
+  }
+  pinPop(){ if(this.state.authBusy) return; this.setState({pin:(this.state.pin||"").slice(0,-1),authErr:""}); }
+  pinClear(){ if(this.state.authBusy) return; this.setState({pin:"",authErr:""}); }
+  doPinLogin(pin){
+    var self=this; this.setState({authBusy:true,authErr:""});
+    fetch(this.apiRoot()+"/auth/pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:pin})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(o){ if(!o.ok){ self.setState({authErr:(o.d&&o.d.detail)||"Невірний код доступу.",authBusy:false,pin:""}); return; } self.applyAuth(o.d); })
+      .catch(function(){ self._localPinLogin(pin); });   // no backend -> offline unlock (static demo)
+  }
+  _localPinLogin(pin){
+    if(pin!=="1995"){ this.setState({authErr:"Невірний код доступу.",authBusy:false,pin:""}); return; }
+    var user={name:"AGROUP",email:"team@agroup95.com",company:"Alliance Group 95"};
+    try{ localStorage.setItem("gp_user",JSON.stringify(user)); }catch(e){}
+    this.setState({user:user,authErr:"",pin:"",authBusy:false});
+    this.say&&this.say("celebrate","Вітаю!",{bubble:true});
+  }
   // Fetch auth mode once so the register form can show/hide the invite-code field.
   loadAuthConfig(){
     try{ fetch(this.apiRoot()+"/auth/config").then(r=>r.json()).then(d=>{ if(d&&d.signup_code_required) this.setState({authCodeRequired:true}); }).catch(()=>{}); }catch(e){}
@@ -1241,7 +1276,7 @@ class Component extends DCLogic {
       .then(function(o){ if(!o.ok){ self.setState({authErr:(o.d&&o.d.detail)||"Невірний email або пароль.",authBusy:false}); return; } self.applyAuth(o.d); })
       .catch(function(){ self._localLogin(); });        // no backend -> offline fallback (demo)
   }
-  doLogout(){ try{ localStorage.removeItem("gp_user"); localStorage.removeItem("gp_token"); }catch(e){} this.setState({user:null,authMode:"login",authPass:"",authErr:""}); }
+  doLogout(){ try{ localStorage.removeItem("gp_user"); localStorage.removeItem("gp_token"); }catch(e){} this.setState({user:null,pin:"",authErr:""}); }
 
   // Offline fallback (static demo without a backend) — local-only accounts.
   _localRegister(){
@@ -2920,20 +2955,15 @@ class Component extends DCLogic {
       ...this.rfqVals(),
       notAuthed: !S.user,
       authMascot:this.buildMascot(S.user?"happy":"encouraging",200),
-      authIsRegister: S.authMode==="register",
-      authLoginBg:S.authMode==="login"?"var(--card)":"transparent", authLoginFg:S.authMode==="login"?"var(--ink)":"var(--muted)",
-      authRegBg:S.authMode==="register"?"var(--card)":"transparent", authRegFg:S.authMode==="register"?"var(--ink)":"var(--muted)",
-      onAuthLoginTab:()=>this.setState({authMode:"login",authErr:""}), onAuthRegTab:()=>this.setState({authMode:"register",authErr:""}),
-      authName:S.authName, onAuthName:(e)=>this.setState({authName:e.target.value}),
-      authCompany:S.authCompany, onAuthCompany:(e)=>this.setState({authCompany:e.target.value}),
-      authEmail:S.authEmail, onAuthEmail:(e)=>this.setState({authEmail:e.target.value}),
-      authPass:S.authPass, onAuthPass:(e)=>this.setState({authPass:e.target.value}),
-      authCode:S.authCode||"", onAuthCode:(e)=>this.setState({authCode:e.target.value}),
-      authCodeRequired:!!S.authCodeRequired && S.authMode==="register",
       authErr:S.authErr,
-      authCTA:S.authBusy?"Зачекайте…":(S.authMode==="register"?"Створити акаунт":"Увійти"),
-      authHint:S.authMode==="register"?"Акаунт захищений на сервері. Для реєстрації може знадобитись код запрошення.":"Ще немає акаунта? Оберіть «Реєстрація».",
-      onAuthSubmit:()=>{ if(this.state.authBusy) return; this.state.authMode==="register"?this.doRegister():this.doLogin(); },
+      pinDot0Bg:(S.pin||"").length>0?"var(--accent)":"transparent",
+      pinDot1Bg:(S.pin||"").length>1?"var(--accent)":"transparent",
+      pinDot2Bg:(S.pin||"").length>2?"var(--accent)":"transparent",
+      pinDot3Bg:(S.pin||"").length>3?"var(--accent)":"transparent",
+      onPin0:()=>this.pinPush("0"), onPin1:()=>this.pinPush("1"), onPin2:()=>this.pinPush("2"),
+      onPin3:()=>this.pinPush("3"), onPin4:()=>this.pinPush("4"), onPin5:()=>this.pinPush("5"),
+      onPin6:()=>this.pinPush("6"), onPin7:()=>this.pinPush("7"), onPin8:()=>this.pinPush("8"),
+      onPin9:()=>this.pinPush("9"), onPinBack:()=>this.pinPop(), onPinClear:()=>this.pinClear(),
       userName:S.user?S.user.name:"", userCompany:S.user?(S.user.company||S.user.email):"", userInitials:this.initials(S.user?S.user.name:""),
       onLogout:()=>this.doLogout(), iconLogout:this.icon("logout"),
 
