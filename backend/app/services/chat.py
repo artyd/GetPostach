@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..tools import registry
+from . import extract
 
 settings = get_settings()
 
@@ -102,16 +103,23 @@ def _apply_attachments(convo: list[dict], attachments: list[dict] | None) -> lis
             data = a.get("data") or ""
             if not data:
                 continue
+            name = a.get("name") or "файл"
             if kind == "image":
                 blocks.append({"type": "image", "source": {
                     "type": "base64", "media_type": a.get("media_type") or "image/png", "data": data}})
             elif kind == "pdf":
                 blocks.append({"type": "document",
                                "source": {"type": "base64", "media_type": "application/pdf", "data": data},
-                               "title": a.get("name") or "document.pdf"})
-            else:
+                               "title": name})
+            elif kind == "text":
+                # Already plain text (frontend read csv/txt/json/… as text).
                 blocks.append({"type": "text",
-                               "text": f"\n\n[Прикріплений файл: {a.get('name') or 'файл'}]\n{str(data)[:200000]}"})
+                               "text": f"\n\n[Прикріплений файл: {name}]\n{str(data)[:extract.MAX_CHARS]}"})
+            else:
+                # Binary file (xlsx/xls/dbf/docx/…) sent base64 — extract readable text.
+                body = extract.extract_text(name, a.get("media_type"), data)
+                blocks.append({"type": "text",
+                               "text": f"\n\n[Прикріплений файл: {name}]\n{body}"})
         convo[idx] = {"role": "user", "content": blocks}
         break
     return convo

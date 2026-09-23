@@ -34,10 +34,10 @@ class ChatMessage(BaseModel):
 
 
 class Attachment(BaseModel):
-    kind: str = "text"          # "image" | "pdf" | "text"
+    kind: str = "text"          # "image" | "pdf" | "text" | "file"
     name: str | None = None
     media_type: str | None = None
-    data: str = ""              # base64 for image/pdf, raw text for text
+    data: str = ""              # base64 for image/pdf/file, raw text for text
 
 
 class ChatRequest(BaseModel):
