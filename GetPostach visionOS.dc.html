@@ -1856,8 +1856,17 @@ class Component extends DCLogic {
   // (xlsx, xls, dbf, docx, …) is sent as raw bytes (base64) and parsed on the
   // server — reading a binary file as text here just produces unreadable garbage.
   isTextFile(name, mime){
+    mime=(mime||"").toLowerCase();
+    const ext=((name||"").split(".").pop()||"").toLowerCase();
+    // Binary / office documents (xlsx, docx, pptx, ods, xls, doc, dbf, …) are
+    // parsed on the server — never read them as text here. Their OOXML MIME type
+    // literally contains the substring "xml" (…openXMLformats…), so the generic
+    // "xml" check below would otherwise misclassify them and send unreadable
+    // garbage as kind:"text", bypassing the server-side parser entirely.
+    if(/^(xlsx|xlsm|xlsb|xls|docx|doc|pptx|ppt|ods|odt|dbf|zip|eml|msg)$/.test(ext)) return false;
+    if(/officedocument|opendocument|ms-excel|msword|ms-powerpoint|spreadsheet|presentation|vnd\.ms-/.test(mime)) return false;
     if(/^text\//.test(mime)) return true;
-    if(/(json|xml|csv|yaml|javascript|typescript|x-sh|sql|markdown)/.test(mime)) return true;
+    if(/\b(json|xml|csv|yaml|javascript|typescript|x-sh|sql|markdown)\b/.test(mime)) return true;
     return /\.(txt|csv|tsv|tab|md|markdown|json|xml|html?|ya?ml|log|ini|cfg|conf|sql|py|js|ts|css|srt)$/i.test(name||"");
   }
   addFiles(list){
