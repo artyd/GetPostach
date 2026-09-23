@@ -1862,7 +1862,7 @@ class Component extends DCLogic {
   }
   addFiles(list){
     if(!list||!list.length) return;
-    const arr=Array.prototype.slice.call(list).slice(0,6);
+    const arr=Array.prototype.slice.call(list).slice(0,10);
     const MAX=20*1024*1024;
     arr.forEach((file)=>{
       const mime=file.type||""; const isImg=/^image\//.test(mime); const isPdf=mime==="application/pdf"||/\.pdf$/i.test(file.name||"");
