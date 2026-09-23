@@ -1865,12 +1865,34 @@ class Component extends DCLogic {
     const arr=Array.prototype.slice.call(list).slice(0,10);
     const MAX=20*1024*1024;
     arr.forEach((file)=>{
-      const mime=file.type||""; const isImg=/^image\//.test(mime); const isPdf=mime==="application/pdf"||/\.pdf$/i.test(file.name||"");
-      const name=file.name||(isImg?("зображення.png"):"файл");
+      const mime=file.type||"";
+      const nm=file.name||"";
+      const isHeic=/\.(heic|heif)$/i.test(nm)||/image\/hei[cf]/.test(mime);
+      const isImg=/^image\//.test(mime)||isHeic||/\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(nm);
+      const isPdf=mime==="application/pdf"||/\.pdf$/i.test(nm);
+      const name=nm||(isImg?"зображення.jpg":"файл");
       if((file.size||0)>MAX){ this.say&&this.say("neutral","Файл завеликий (>20 МБ): "+name,{toast:true}); return; }
-      if(isImg||isPdf){
+      if(isImg){
+        // Small native-format images go as-is (crisp); big photos / HEIC / exotic
+        // formats are downscaled to fit Vision's limits and re-encoded to JPEG.
+        const nativeSmall=/^image\/(jpeg|png|gif|webp)$/.test(mime) && (file.size||0)<=4*1024*1024;
+        if(nativeSmall){
+          const r=new FileReader();
+          r.onload=()=>{ const b64=String(r.result||"").split(",")[1]||""; this._pushFile({name:name, kind:"image", media_type:mime, data:b64}); };
+          r.readAsDataURL(file);
+        } else {
+          this.compressImage(file,(b64)=>{
+            if(!b64){
+              if(isHeic) this.say&&this.say("neutral","HEIC не читається у цьому браузері. На iPhone: Налаштування → Камера → Формати → «Найсумісніший», або надішліть JPEG/PNG.",{toast:true,bubble:true});
+              else this.say&&this.say("neutral","Не вдалося обробити зображення: "+name,{toast:true});
+              return;
+            }
+            this._pushFile({name:name.replace(/\.(heic|heif|bmp|tiff?)$/i,".jpg"), kind:"image", media_type:"image/jpeg", data:b64});
+          });
+        }
+      } else if(isPdf){
         const r=new FileReader();
-        r.onload=()=>{ const b64=String(r.result||"").split(",")[1]||""; this._pushFile({name:name, kind:isImg?"image":"pdf", media_type:mime||(isPdf?"application/pdf":"image/png"), data:b64}); };
+        r.onload=()=>{ const b64=String(r.result||"").split(",")[1]||""; this._pushFile({name:name, kind:"pdf", media_type:"application/pdf", data:b64}); };
         r.readAsDataURL(file);
       } else if(this.isTextFile(name,mime)){
         const r=new FileReader();
@@ -1883,6 +1905,31 @@ class Component extends DCLogic {
         r.readAsDataURL(file);
       }
     });
+  }
+  // Downscale/compress an image in-browser so it fits Claude Vision's limits
+  // (~5 MB, long edge ~1568px). Also converts HEIC where the browser can decode
+  // it (Safari/iOS). Calls cb(base64) on success, cb(null) if it can't decode.
+  compressImage(file, cb){
+    try{
+      const url=URL.createObjectURL(file);
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+          if(!w||!h){ URL.revokeObjectURL(url); cb(null); return; }
+          const MAXD=1568, scale=Math.min(1, MAXD/Math.max(w,h));
+          w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+          const c=document.createElement("canvas"); c.width=w; c.height=h;
+          const ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+          let q=0.85, out=c.toDataURL("image/jpeg",q);
+          while(out.length>5*1024*1024 && q>0.4){ q-=0.12; out=c.toDataURL("image/jpeg",q); }
+          URL.revokeObjectURL(url);
+          cb(out.split(",")[1]||"");
+        }catch(e){ URL.revokeObjectURL(url); cb(null); }
+      };
+      img.onerror=()=>{ URL.revokeObjectURL(url); cb(null); };
+      img.src=url;
+    }catch(e){ cb(null); }
   }
   onAttachClick(){ try{ const el=document.getElementById("gpFileInput"); if(el){ el.value=""; el.click(); } }catch(e){} }
   onFilePick(e){ this.addFiles(e.target.files); }

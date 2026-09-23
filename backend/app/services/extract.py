@@ -15,11 +15,17 @@ import base64
 import csv
 import html
 import io
+import itertools
 import json
 import re
 import tempfile
 from collections import deque
 from pathlib import Path
+
+# Safety bounds for zip-based formats (xlsx/docx/pptx/ods/zip) — guard against
+# decompression bombs: a tiny upload must not expand into gigabytes.
+ZIP_MAX_TOTAL = 400 * 1024 * 1024
+ZIP_MAX_FILES = 300
 
 # Keep the text we feed the model bounded so a huge import DB can't blow the
 # context window. We still tell the model exactly how much was truncated.
@@ -66,7 +72,11 @@ def _cell(v) -> str:
 
 
 def _num(v):
-    """Parse a cell as a number, tolerating '12,5', spaces and NBSP; else None."""
+    """Parse a cell as a number across locales.
+
+    Handles '12,5' (comma decimal), '1.234,56' (euro) and '1,234.56' (anglo)
+    thousands, NBSP/space/apostrophe separators and a trailing %.
+    """
     if v is None or isinstance(v, bool):
         return None
     if isinstance(v, (int, float)):
@@ -74,8 +84,18 @@ def _num(v):
     s = str(v).strip().replace(" ", "").replace(" ", "")
     if not s:
         return None
-    if s.count(",") == 1 and s.count(".") == 0:
-        s = s.replace(",", ".")
+    s = s.replace("'", "").rstrip("%")
+    has_c, has_d = "," in s, "." in s
+    if has_c and has_d:
+        if s.rfind(",") > s.rfind("."):      # euro: 1.234,56 -> 1234.56
+            s = s.replace(".", "").replace(",", ".")
+        else:                                 # anglo: 1,234.56 -> 1234.56
+            s = s.replace(",", "")
+    elif has_c:
+        if s.count(",") == 1 and len(s.split(",")[1]) != 3:
+            s = s.replace(",", ".")     # 11,4 -> 11.4
+        else:
+            s = s.replace(",", "")       # 1,234 -> 1234
     try:
         return float(s)
     except ValueError:
@@ -167,6 +187,36 @@ def _render_table(title: str, header, row_iter, ncols_hint: int = 0) -> str:
     return "\n".join(lines)
 
 
+def _detect_header(rows: list[list]) -> int:
+    """Pick the most header-like row among the first few (customs/pharma exports
+    often carry a title/period line above the real column headers)."""
+    best_i, best_score = 0, -1.0
+    for i in range(min(len(rows), 6)):
+        cells = [c for c in rows[i] if _cell(c).strip()]
+        if not cells:
+            continue
+        nonnum = sum(1 for c in cells if _num(c) is None)
+        nxt = rows[i + 1] if i + 1 < len(rows) else []
+        nxt_num = sum(1 for c in nxt if _num(c) is not None)
+        score = len(cells) + nonnum + (2 if nxt_num else 0) - i * 0.5
+        if score > best_score:
+            best_score, best_i = score, i
+    return best_i
+
+
+def _table_from_iter(title: str, row_iter, ncols_hint: int = 0) -> str:
+    """Detect the header row from a peek, then render the rest as a table."""
+    it = iter(row_iter)
+    preview = [list(r) for r in itertools.islice(it, 15)]
+    if not preview:
+        return f"{title} (порожньо)"
+    hi = _detect_header(preview)
+    header = preview[hi]
+    rest = itertools.chain(preview[hi + 1:], it)
+    note = "" if hi == 0 else f"\n(шапку знайдено у рядку {hi + 1}; рядки над нею пропущено)"
+    return _render_table(title, header, rest, ncols_hint) + note
+
+
 # ---------- per-format parsers ----------
 def _from_csv(raw: bytes) -> str:
     text = _decode(raw)
@@ -176,11 +226,7 @@ def _from_csv(raw: bytes) -> str:
     except Exception:
         delim = ";" if sample.count(";") > sample.count(",") else ","
     reader = csv.reader(io.StringIO(text), delimiter=delim)
-    try:
-        header = next(reader)
-    except StopIteration:
-        return "(порожній CSV)"
-    return _render_table(f"[CSV, роздільник «{delim}»]", header, reader)
+    return _table_from_iter(f"[CSV, роздільник «{delim}»]", reader)
 
 
 def _from_xlsx(raw: bytes) -> str:
@@ -191,12 +237,8 @@ def _from_xlsx(raw: bytes) -> str:
     try:
         for ws in wb.worksheets:
             it = ws.iter_rows(values_only=True)
-            header = next(it, None)
-            if header is None:
-                parts.append(f"### Аркуш «{ws.title}» — порожній")
-                continue
-            parts.append(_render_table(f"### Аркуш «{ws.title}»", header, it,
-                                       ncols_hint=ws.max_column or 0))
+            parts.append(_table_from_iter(f"### Аркуш «{ws.title}»", it,
+                                          ncols_hint=ws.max_column or 0))
     finally:
         wb.close()
     return "\n\n".join(parts) if parts else "(порожня книга Excel)"
@@ -211,10 +253,9 @@ def _from_xls(raw: bytes) -> str:
         if sh.nrows == 0:
             parts.append(f"### Аркуш «{sh.name}» — порожній")
             continue
-        header = sh.row_values(0)
-        rows = (sh.row_values(r) for r in range(1, sh.nrows))
-        parts.append(_render_table(f"### Аркуш «{sh.name}»", header, rows,
-                                   ncols_hint=sh.ncols))
+        rows = (sh.row_values(r) for r in range(sh.nrows))
+        parts.append(_table_from_iter(f"### Аркуш «{sh.name}»", rows,
+                                      ncols_hint=sh.ncols))
     return "\n\n".join(parts) if parts else "(порожня книга Excel)"
 
 
@@ -238,22 +279,175 @@ def _from_dbf(raw: bytes) -> str:
             Path(tmp).unlink(missing_ok=True)
 
 
-def _from_docx(raw: bytes) -> str:
+def _zip_guard(raw: bytes) -> None:
+    """Reject decompression bombs before we expand a zip-based document."""
     import zipfile
 
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
-        names = z.namelist()
-        xml = ""
-        for part in ("word/document.xml",):
-            if part in names:
-                xml = z.read(part).decode("utf-8", "replace")
-                break
-    if not xml:
-        return "(не вдалося знайти текст у DOCX)"
-    xml = re.sub(r"</w:p>", "\n", xml)
+        infos = z.infolist()
+        if len(infos) > ZIP_MAX_FILES:
+            raise ValueError(f"забагато файлів в архіві ({len(infos)})")
+        if sum(i.file_size for i in infos) > ZIP_MAX_TOTAL:
+            raise ValueError("розпакований розмір архіву завеликий")
+
+
+def _from_docx(raw: bytes) -> str:
+    import zipfile
+
+    _zip_guard(raw)
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        if "word/document.xml" not in z.namelist():
+            return "(не вдалося знайти текст у DOCX)"
+        xml = z.read("word/document.xml").decode("utf-8", "replace")
+    # Flatten tables to tab-separated rows; keep paragraph breaks elsewhere.
+    xml = re.sub(r"</w:p>\s*</w:tc>", "</w:tc>", xml)   # 1 paragraph per cell
     xml = re.sub(r"<w:tab[^>]*/>", "\t", xml)
+    xml = xml.replace("</w:tc>", "\t").replace("</w:tr>", "\n").replace("</w:p>", "\n")
     xml = re.sub(r"<[^>]+>", "", xml)
-    return html.unescape(xml).strip()
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", html.unescape(xml))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _from_pptx(raw: bytes) -> str:
+    import zipfile
+
+    _zip_guard(raw)
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        slides = sorted(
+            (n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)),
+            key=lambda n: int(re.search(r"(\d+)", n).group(1)),
+        )
+        out = []
+        for i, n in enumerate(slides, 1):
+            xml = z.read(n).decode("utf-8", "replace")
+            xml = re.sub(r"</a:p>", "\n", xml)
+            txt = html.unescape(re.sub(r"<[^>]+>", "", xml)).strip()
+            if txt:
+                out.append(f"### Слайд {i}\n{txt}")
+    return "\n\n".join(out) if out else "(порожня презентація)"
+
+
+def _from_ods(raw: bytes) -> str:
+    import zipfile
+
+    _zip_guard(raw)
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        xml = z.read("content.xml").decode("utf-8", "replace")
+    parts = []
+    for tm in re.finditer(r"<table:table\b[^>]*?table:name=\"([^\"]*)\"[^>]*>(.*?)</table:table>", xml, re.S):
+        name, body = tm.group(1), tm.group(2)
+        rows = []
+        for rm in re.finditer(r"<table:table-row\b[^>]*>(.*?)</table:table-row>", body, re.S):
+            cells = []
+            for cm in re.finditer(r"<table:table-cell\b([^>]*?)(?:/>|>(.*?)</table:table-cell>)", rm.group(1), re.S):
+                attrs, inner = cm.group(1) or "", cm.group(2) or ""
+                txt = html.unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+                rep = re.search(r'number-columns-repeated="(\d+)"', attrs)
+                cells.extend([txt] * min(int(rep.group(1)) if rep else 1, 512))
+            while cells and cells[-1] == "":
+                cells.pop()
+            if cells:
+                rows.append(cells)
+        if rows:
+            parts.append(_table_from_iter(f"### Таблиця «{name}»", iter(rows)))
+    return "\n\n".join(parts) if parts else "(порожній ODS)"
+
+
+def _from_eml(raw: bytes) -> str:
+    import email
+    from email import policy
+
+    msg = email.message_from_bytes(raw, policy=policy.default)
+    hdr = [f"Від: {msg.get('from','')}", f"Кому: {msg.get('to','')}",
+           f"Дата: {msg.get('date','')}", f"Тема: {msg.get('subject','')}"]
+    body = ""
+    try:
+        b = msg.get_body(preferencelist=("plain", "html"))
+        if b:
+            body = b.get_content()
+            if b.get_content_type() == "text/html":
+                body = html.unescape(re.sub(r"<[^>]+>", " ", body))
+    except Exception:  # noqa: BLE001
+        body = ""
+    out = ["\n".join(hdr), "", body.strip()]
+    for part in msg.iter_attachments():
+        fn = part.get_filename() or "attachment"
+        try:
+            payload = part.get_content()
+            payload = payload.encode("utf-8", "replace") if isinstance(payload, str) else payload
+        except Exception:  # noqa: BLE001
+            payload = part.get_payload(decode=True) or b""
+        if isinstance(payload, (bytes, bytearray)):
+            out.append(f"\n--- Вкладення: {fn} ---\n" + _extract_bytes(fn, part.get_content_type(), bytes(payload))[:20000])
+    return "\n".join(out)
+
+
+def _from_msg(raw: bytes) -> str:
+    import extract_msg
+
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".msg", delete=False) as tf:
+            tf.write(raw)
+            tmp = tf.name
+        m = extract_msg.Message(tmp)
+        hdr = [f"Від: {m.sender or ''}", f"Кому: {m.to or ''}",
+               f"Дата: {m.date or ''}", f"Тема: {m.subject or ''}"]
+        out = "\n".join(hdr) + "\n\n" + (m.body or "")
+        for att in (m.attachments or []):
+            fn = getattr(att, "longFilename", None) or getattr(att, "shortFilename", None) or "attachment"
+            data = getattr(att, "data", None)
+            if isinstance(data, (bytes, bytearray)):
+                out += f"\n\n--- Вкладення: {fn} ---\n" + _extract_bytes(fn, None, bytes(data))[:20000]
+        m.close()
+        return out
+    finally:
+        if tmp:
+            Path(tmp).unlink(missing_ok=True)
+
+
+def _from_doc(raw: bytes) -> str:
+    """Legacy binary .doc — best-effort text (recommend .docx for fidelity)."""
+    import olefile
+
+    if not olefile.isOleFile(io.BytesIO(raw)):
+        return _decode(raw)
+    ole = olefile.OleFileIO(io.BytesIO(raw))
+    try:
+        data = ole.openstream("WordDocument").read() if ole.exists("WordDocument") else b""
+    finally:
+        ole.close()
+    best = ""
+    for enc in ("cp1251", "utf-16-le", "latin-1"):
+        t = data.decode(enc, "ignore")
+        runs = re.findall(r"[ \t\w.,;:!?\-()«»№%/@°+…Ѐ-ӿ]{4,}", t)
+        cand = "\n".join(r.strip() for r in runs if len(r.strip()) >= 4)
+        if len(cand) > len(best):
+            best = cand
+    best = re.sub(r"\n{3,}", "\n\n", best).strip()
+    return best or "(Не вдалося витягти текст із .doc — збережіть як .docx для точного розбору.)"
+
+
+def _from_zip(raw: bytes) -> str:
+    import zipfile
+
+    _zip_guard(raw)
+    out, n = [], 0
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            n += 1
+            if n > 50:
+                out.append("…(в архіві ще файли — показано перші 50)")
+                break
+            try:
+                data = z.read(info)
+            except Exception as exc:  # noqa: BLE001
+                out.append(f"### {info.filename}: не вдалося прочитати ({exc})")
+                continue
+            out.append(f"### Файл з архіву: {info.filename}\n" + _extract_bytes(info.filename, None, data)[:30000])
+    return "\n\n".join(out) if out else "(порожній архів)"
 
 
 def _from_json(raw: bytes) -> str:
@@ -265,54 +459,78 @@ def _from_json(raw: bytes) -> str:
 
 
 def _sniff_zip_kind(raw: bytes) -> str | None:
-    """PK-zip container: distinguish xlsx vs docx vs pptx by inner parts."""
+    """PK-zip container: tell xlsx / docx / pptx / ods apart by inner parts."""
     try:
         import zipfile
 
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
             names = set(z.namelist())
-        if any(n.startswith("xl/") for n in names):
-            return "xlsx"
-        if any(n.startswith("word/") for n in names):
-            return "docx"
+            mimetype = z.read("mimetype").decode("ascii", "ignore") if "mimetype" in names else ""
     except Exception:
-        pass
+        return None
+    if "spreadsheet" in mimetype:
+        return "ods"
+    if any(n.startswith("xl/") for n in names):
+        return "xlsx"
+    if any(n.startswith("word/") for n in names):
+        return "docx"
+    if any(n.startswith("ppt/") for n in names):
+        return "pptx"
+    if "content.xml" in names:
+        return "ods"
     return None
 
 
 # ---------- public entry point ----------
 def extract_text(name: str | None, media_type: str | None, data_b64: str) -> str:
     """Decode a base64 file and return compact readable text (never raises)."""
-    name = name or "файл"
-    ext = (name.rsplit(".", 1)[-1].lower() if "." in name else "")
-    mt = (media_type or "").lower()
-
     try:
         raw = base64.b64decode(data_b64, validate=False)
     except Exception:
         # Not valid base64 — assume the caller already sent us plain text.
         return _cap(str(data_b64))
+    return _extract_bytes(name or "файл", media_type, raw)
+
+
+def _extract_bytes(name: str | None, media_type: str | None, raw: bytes) -> str:
+    """Dispatch raw bytes to the right parser. Used directly for nested files
+    (email attachments, zip entries) so recursion needs no re-encoding."""
+    name = name or "файл"
+    ext = (name.rsplit(".", 1)[-1].lower() if "." in name else "")
+    mt = (media_type or "").lower()
 
     if not raw:
         return "(порожній файл)"
 
     # Normalise ambiguous extensions / office MIME types via magic bytes.
-    if ext in ("xlsx", "xlsm", "docx", "pptx") or "openxmlformats" in mt or raw[:4] == b"PK\x03\x04":
+    if ext in ("xlsx", "xlsm", "docx", "pptx", "ods") or "openxmlformats" in mt or raw[:4] == b"PK\x03\x04":
         sniffed = _sniff_zip_kind(raw)
-        if sniffed:
-            ext = sniffed if ext not in ("xlsx", "xlsm", "docx") else ext
-    if raw[:4] == b"\xd0\xcf\x11\xe0" and ext not in ("xls", "doc"):  # legacy OLE2
-        ext = "xls" if "excel" in mt or "sheet" in mt else ext
+        if sniffed and ext not in ("xlsx", "xlsm", "docx", "pptx", "ods"):
+            ext = sniffed
+    if raw[:4] == b"\xd0\xcf\x11\xe0" and ext not in ("xls", "doc", "msg", "ppt"):  # legacy OLE2
+        ext = "xls" if ("excel" in mt or "sheet" in mt) else ext
 
     try:
         if ext in ("xlsx", "xlsm"):
             return _cap(_from_xlsx(raw), " аркуш")
         if ext == "xls":
             return _cap(_from_xls(raw))
+        if ext == "ods":
+            return _cap(_from_ods(raw))
         if ext == "dbf":
             return _cap(_from_dbf(raw))
         if ext == "docx":
             return _cap(_from_docx(raw))
+        if ext == "doc":
+            return _cap(_from_doc(raw))
+        if ext in ("pptx", "ppt"):
+            return _cap(_from_pptx(raw))
+        if ext == "eml":
+            return _cap(_from_eml(raw))
+        if ext == "msg":
+            return _cap(_from_msg(raw))
+        if ext == "zip":
+            return _cap(_from_zip(raw))
         if ext in ("csv", "tsv", "tab"):
             return _cap(_from_csv(raw))
         if ext == "json":
