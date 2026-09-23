@@ -1852,21 +1852,35 @@ class Component extends DCLogic {
   fileIcon(kind){ return kind==="image"?"🖼":(kind==="pdf"?"📕":"📄"); }
   _pushFile(f){ this.setState({chatFiles:(this.state.chatFiles||[]).concat([f])}); }
   removeFile(i){ const a=(this.state.chatFiles||[]).slice(); a.splice(i,1); this.setState({chatFiles:a}); }
+  // Extensions we can safely read as plain text in the browser. Everything else
+  // (xlsx, xls, dbf, docx, …) is sent as raw bytes (base64) and parsed on the
+  // server — reading a binary file as text here just produces unreadable garbage.
+  isTextFile(name, mime){
+    if(/^text\//.test(mime)) return true;
+    if(/(json|xml|csv|yaml|javascript|typescript|x-sh|sql|markdown)/.test(mime)) return true;
+    return /\.(txt|csv|tsv|tab|md|markdown|json|xml|html?|ya?ml|log|ini|cfg|conf|sql|py|js|ts|css|srt)$/i.test(name||"");
+  }
   addFiles(list){
     if(!list||!list.length) return;
     const arr=Array.prototype.slice.call(list).slice(0,6);
+    const MAX=20*1024*1024;
     arr.forEach((file)=>{
       const mime=file.type||""; const isImg=/^image\//.test(mime); const isPdf=mime==="application/pdf"||/\.pdf$/i.test(file.name||"");
       const name=file.name||(isImg?("зображення.png"):"файл");
+      if((file.size||0)>MAX){ this.say&&this.say("neutral","Файл завеликий (>20 МБ): "+name,{toast:true}); return; }
       if(isImg||isPdf){
-        if((file.size||0)>6*1024*1024){ this.say&&this.say("neutral","Файл завеликий (>6 МБ): "+name,{toast:true}); return; }
         const r=new FileReader();
         r.onload=()=>{ const b64=String(r.result||"").split(",")[1]||""; this._pushFile({name:name, kind:isImg?"image":"pdf", media_type:mime||(isPdf?"application/pdf":"image/png"), data:b64}); };
         r.readAsDataURL(file);
-      } else {
+      } else if(this.isTextFile(name,mime)){
         const r=new FileReader();
         r.onload=()=>{ let t=String(r.result||""); if(t.length>200000) t=t.slice(0,200000)+"\n…(обрізано)"; this._pushFile({name:name, kind:"text", media_type:mime||"text/plain", data:t}); };
         r.readAsText(file);
+      } else {
+        // Binary document (Excel/DBF/Word/…): keep the bytes intact for server-side parsing.
+        const r=new FileReader();
+        r.onload=()=>{ const b64=String(r.result||"").split(",")[1]||""; this._pushFile({name:name, kind:"file", media_type:mime||"application/octet-stream", data:b64}); };
+        r.readAsDataURL(file);
       }
     });
   }
