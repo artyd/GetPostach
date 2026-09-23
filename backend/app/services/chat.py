@@ -9,6 +9,7 @@ Grounded in real data — the system prompt forbids inventing numbers.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 
 import anthropic
@@ -19,6 +20,7 @@ from ..tools import registry
 from . import extract
 
 settings = get_settings()
+logger = logging.getLogger("pigulkin.chat")
 
 SYSTEM_PROMPT = """\
 Ти — Пігулькін, AI-помічник відділу закупівель Alliance Group 95 (фарма, косметика, \
@@ -127,6 +129,15 @@ def _apply_attachments(convo: list[dict], attachments: list[dict] | None) -> lis
             else:
                 # Binary file (xlsx/xls/dbf/docx/…) sent base64 — extract readable text.
                 body = extract.extract_text(name, a.get("media_type"), data)
+                # If parsing yielded nothing usable (empty, or an honest "(не
+                # вдалося…)" note), the model is about to receive a file it can't
+                # act on — surface it in the logs instead of failing silently.
+                stripped = body.strip()
+                if not stripped or stripped.startswith("("):
+                    logger.warning(
+                        "attachment %r (%s) produced no usable text (%d chars): %s",
+                        name, a.get("media_type") or "?", len(stripped), stripped[:200],
+                    )
                 blocks.append({"type": "text",
                                "text": f"\n\n[Прикріплений файл: {name}]\n{body}"})
         convo[idx] = {"role": "user", "content": blocks}

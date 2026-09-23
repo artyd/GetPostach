@@ -17,10 +17,13 @@ import html
 import io
 import itertools
 import json
+import logging
 import re
 import tempfile
 from collections import deque
 from pathlib import Path
+
+logger = logging.getLogger("pigulkin.extract")
 
 # Safety bounds for zip-based formats (xlsx/docx/pptx/ods/zip) — guard against
 # decompression bombs: a tiny upload must not expand into gigabytes.
@@ -542,11 +545,27 @@ def _extract_bytes(name: str | None, media_type: str | None, raw: bytes) -> str:
         printable = sum(c.isprintable() or c in "\r\n\t" for c in text[:2000])
         if text and printable / max(1, len(text[:2000])) > 0.85:
             return _cap(text)
+        # A recognised binary container (zip/OOXML or OLE2) that reaches this
+        # branch means we handed the model unreadable bytes instead of parsed
+        # text — the exact silent degradation we want visible in the logs.
+        looks_container = raw[:4] in (b"PK\x03\x04", b"\xd0\xcf\x11\xe0")
+        logger.warning(
+            "extract: unrecognised format for %r (ext=%r, mt=%r, %d bytes, container=%s)",
+            name, ext, mt, len(raw), looks_container,
+        )
         return (
             f"(Не вдалося розпізнати вміст файлу «{name}» — формат «{ext or mt or 'невідомий'}» "
             f"не підтримується для читання. Розмір: {len(raw)} байт.)"
         )
     except ModuleNotFoundError as exc:
+        logger.warning(
+            "extract: missing library %r to read %r (ext=%r, %d bytes)",
+            exc.name, name, ext, len(raw),
+        )
         return f"(Файл «{name}»: для читання формату «{ext}» бракує бібліотеки {exc.name} на сервері.)"
     except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "extract: failed to parse %r (ext=%r, mt=%r, %d bytes): %s",
+            name, ext, mt, len(raw), exc, exc_info=True,
+        )
         return f"(Не вдалося прочитати файл «{name}» ({ext or mt}): {exc})"
